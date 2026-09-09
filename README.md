@@ -1,31 +1,35 @@
-# HotbarPets
-HotbarPets is a [Slimefun4](https://github.com/TheBusyBiscuit/Slimefun4/) Addon.<br>
-You need to install Slimefun4 in order for this plugin to work.
+# SF_HotbarPets
 
-HotbarPets is a Slimefun4 Addon that is heavily inspired by the famous mod [InventoryPets](https://www.curseforge.com/minecraft/mc-mods/inventory-pets).
-It adds new items to Slimefun that act like "Pets".
-If you carry them in your Hotbar they can prevent you from taking certain types of damage, give you free items or Potion Effects.
-But only if you also carry their favourite food with you.
+Maintained HotbarPets fork for modern Slimefun servers.
 
-[Read more...](https://github.com/TheBusyBiscuit/Slimefun4/wiki/HotbarPets)
+HotbarPets adds inventory pets that grant effects, prevent certain damage, or produce items while carried in the hotbar and supplied with their preferred food.
 
-## Download HotbarPets
-You can download HotbarPets right here: [Development Builds](https://thebusybiscuit.github.io/builds/TheBusyBiscuit/HotbarPets/master/)
+## Compatibility
 
-<p align="center">
-  <a href="https://thebusybiscuit.github.io/builds/TheBusyBiscuit/HotbarPets/master/">
-    <img src="https://thebusybiscuit.github.io/builds/TheBusyBiscuit/HotbarPets/master/badge.svg" alt="Build Server"/>
-  </a>
-</p>
+Primary Slimefun targets:
+- Slimefun Legacy
+- Slimefun United
 
-## Discord
-You can find Slimefun's community on Discord!
-Click the badge down below to join the server for suggestions/questions or other discussions about this plugin.
-<p align="center">
-  <a href="https://discord.gg/fsD4Bkh">
-    <img src="https://img.shields.io/discord/565557184348422174?color=7289DA&label=Discord&style=for-the-badge" alt="Discord Invite"/>
-  </a>
-</p>
+Additional compatibility targets:
+- SlimefunGuguProject/Slimefun4
+- Original Slimefun4-compatible API implementations
 
-## Open Source
-This Project is open-source and licensed under the [MIT License](https://github.com/TheBusyBiscuit/HotbarPets/blob/master/LICENSE)
+Server software:
+- Paper
+- Purpur
+- Folia
+- Leaf
+
+Minecraft target: **1.21.11+**. Builds use Java 25 with Java 21 bytecode.
+
+The maintained fork replaces the old global Bukkit repeating task with Paper's global-region plus per-player entity schedulers. That keeps periodic pet inventory processing on the player's owning scheduler and avoids cross-region player access on Folia.
+
+## Dependency policy
+
+This addon does not directly depend on GuizhanLib and does not use GuizhanLib APIs. Gugu compatibility is provided through the shared Slimefun addon API.
+
+## Maintenance
+
+Original project by TheBusyBiscuit. Current maintenance and modern compatibility work are provided by `wickidcow`.
+
+Report issues at this repository so fixes can be validated against current Slimefun Legacy and Paper-family versions.

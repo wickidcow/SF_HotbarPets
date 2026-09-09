@@ -1,10 +1,5 @@
 package io.github.thebusybiscuit.hotbarpets;
 
-import org.bstats.bukkit.Metrics;
-import org.bukkit.NamespacedKey;
-import org.bukkit.event.Listener;
-import org.bukkit.plugin.java.JavaPlugin;
-
 import io.github.thebusybiscuit.hotbarpets.groups.BossMobs;
 import io.github.thebusybiscuit.hotbarpets.groups.FarmAnimals;
 import io.github.thebusybiscuit.hotbarpets.groups.HostileMobs;
@@ -21,9 +16,12 @@ import io.github.thebusybiscuit.hotbarpets.listeners.SoulPieListener;
 import io.github.thebusybiscuit.hotbarpets.listeners.TNTListener;
 import io.github.thebusybiscuit.slimefun4.api.SlimefunAddon;
 import io.github.thebusybiscuit.slimefun4.api.items.ItemGroup;
-import io.github.thebusybiscuit.slimefun4.libraries.dough.config.Config;
 import io.github.thebusybiscuit.slimefun4.libraries.dough.items.CustomItemStack;
-import io.github.thebusybiscuit.slimefun4.libraries.dough.updater.GitHubBuildsUpdater;
+import org.bstats.bukkit.Metrics;
+import org.bukkit.NamespacedKey;
+import org.bukkit.entity.Player;
+import org.bukkit.event.Listener;
+import org.bukkit.plugin.java.JavaPlugin;
 
 public class HotbarPets extends JavaPlugin implements Listener, SlimefunAddon {
 
@@ -31,18 +29,14 @@ public class HotbarPets extends JavaPlugin implements Listener, SlimefunAddon {
 
     @Override
     public void onEnable() {
-        Config cfg = new Config(this);
-
-        // Setting up bStats
+        saveDefaultConfig();
         new Metrics(this, 4859);
 
-        if (cfg.getBoolean("options.auto-update") && getDescription().getVersion().startsWith("DEV - ")) {
-            new GitHubBuildsUpdater(this, getFile(), "TheBusyBiscuit/HotbarPets/master").start();
-        }
+        itemGroup = new ItemGroup(
+            new NamespacedKey(this, "pets"),
+            new CustomItemStack(PetTexture.CATEGORY.getAsItem(), "&dHotbar Pets", "", "&a> Click to open")
+        );
 
-        itemGroup = new ItemGroup(new NamespacedKey(this, "pets"), new CustomItemStack(PetTexture.CATEGORY.getAsItem(), "&dHotbar Pets", "", "&a> Click to open"));
-
-        // Add all the Pets via their Group class
         new FarmAnimals(this);
         new PeacefulAnimals(this);
         new PassiveMobs(this);
@@ -51,7 +45,6 @@ public class HotbarPets extends JavaPlugin implements Listener, SlimefunAddon {
         new UtilityPets(this);
         new SpecialPets(this);
 
-        // Registering the Listeners
         new DamageListener(this);
         new FoodListener(this);
         new GeneralListener(this);
@@ -60,8 +53,12 @@ public class HotbarPets extends JavaPlugin implements Listener, SlimefunAddon {
         new SoulPieListener(this);
         new TNTListener(this);
 
-        // Registering our task
-        getServer().getScheduler().scheduleSyncRepeatingTask(this, new HotbarPetsRunnable(), 0L, 2000L);
+        HotbarPetsRunnable petTask = new HotbarPetsRunnable();
+        getServer().getGlobalRegionScheduler().runAtFixedRate(this, ignored -> {
+            for (Player player : getServer().getOnlinePlayers()) {
+                player.getScheduler().run(this, task -> petTask.tick(player), null);
+            }
+        }, 1L, 2000L);
     }
 
     public ItemGroup getItemGroup() {
@@ -70,7 +67,7 @@ public class HotbarPets extends JavaPlugin implements Listener, SlimefunAddon {
 
     @Override
     public String getBugTrackerURL() {
-        return "https://github.com/TheBusyBiscuit/HotbarPets/issues";
+        return "https://github.com/wickidcow/SF_HotbarPets/issues";
     }
 
     @Override

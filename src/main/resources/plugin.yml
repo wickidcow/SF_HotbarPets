@@ -1,8 +1,9 @@
 name: HotbarPets
 version: ${project.version}
-author: TheBusyBiscuit
-depend: [Slimefun]
-
-api-version: 1.14
-
+authors: [TheBusyBiscuit, wickidcow]
+description: Modern HotbarPets build for Minecraft 1.21.11+ with Legacy-first Slimefun compatibility and Folia-safe scheduled pet processing.
+website: https://github.com/wickidcow/SF_HotbarPets
 main: io.github.thebusybiscuit.hotbarpets.HotbarPets
+depend: [Slimefun]
+api-version: '1.21'
+folia-supported: true
