@@ -16,12 +16,17 @@ import io.github.thebusybiscuit.hotbarpets.listeners.SoulPieListener;
 import io.github.thebusybiscuit.hotbarpets.listeners.TNTListener;
 import io.github.thebusybiscuit.slimefun4.api.SlimefunAddon;
 import io.github.thebusybiscuit.slimefun4.api.items.ItemGroup;
-import io.github.thebusybiscuit.slimefun4.libraries.dough.items.CustomItemStack;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Listener;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.plugin.java.JavaPlugin;
+
+import java.util.List;
 
 public class HotbarPets extends JavaPlugin implements Listener, SlimefunAddon {
 
@@ -32,10 +37,14 @@ public class HotbarPets extends JavaPlugin implements Listener, SlimefunAddon {
         saveDefaultConfig();
         new Metrics(this, 4859);
 
-        itemGroup = new ItemGroup(
-            new NamespacedKey(this, "pets"),
-            new CustomItemStack(PetTexture.CATEGORY.getAsItem(), "&dHotbar Pets", "", "&a> Click to open")
-        );
+        ItemStack icon = PetTexture.CATEGORY.getAsItem().clone();
+        ItemMeta meta = icon.getItemMeta();
+        if (meta != null) {
+            meta.displayName(Component.text("Hotbar Pets", NamedTextColor.LIGHT_PURPLE));
+            meta.lore(List.of(Component.empty(), Component.text("> Click to open", NamedTextColor.GREEN)));
+            icon.setItemMeta(meta);
+        }
+        itemGroup = new ItemGroup(new NamespacedKey(this, "pets"), icon);
 
         new FarmAnimals(this);
         new PeacefulAnimals(this);
@@ -54,15 +63,25 @@ public class HotbarPets extends JavaPlugin implements Listener, SlimefunAddon {
         new TNTListener(this);
 
         HotbarPetsRunnable petTask = new HotbarPetsRunnable();
+        long productionInterval = Math.max(20L, getConfig().getLong("production-interval-ticks", 2000L));
         getServer().getGlobalRegionScheduler().runAtFixedRate(this, ignored -> {
             for (Player player : getServer().getOnlinePlayers()) {
                 player.getScheduler().run(this, task -> petTask.tick(player), null);
             }
-        }, 1L, 2000L);
+        }, 1L, productionInterval);
+    }
+
+    @Override
+    public void onDisable() {
+        HotbarPet.getMessageDelay().clear();
     }
 
     public ItemGroup getItemGroup() {
         return itemGroup;
+    }
+
+    public boolean isModernPetEnabled(String key) {
+        return getConfig().getBoolean("modern-pets." + key + ".enabled", true);
     }
 
     @Override

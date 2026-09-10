@@ -1,2 +1,14 @@
-options:
-  auto-update: true
+# HotbarPets configuration
+
+# Producer pets (Chicken, Mooshroom, Fish and Golden Cow) keep the classic
+# cadence by default. Raise this value to reduce passive processing frequency.
+production-interval-ticks: 2000
+
+# Additive modern pets. Existing/classic pets and their item IDs are unchanged.
+modern-pets:
+  breeze:
+    enabled: true
+  copper-golem:
+    enabled: true
+  nautilus:
+    enabled: true

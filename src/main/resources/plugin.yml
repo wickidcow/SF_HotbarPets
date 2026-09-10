@@ -1,7 +1,7 @@
 name: HotbarPets
 version: ${project.version}
 authors: [TheBusyBiscuit, wickidcow]
-description: Maintained HotbarPets addon for Slimefun Legacy on Minecraft 1.21.11+ and modern Paper-family servers.
+description: Preserved HotbarPets gameplay with focused modern Minecraft pets for Slimefun Legacy on 1.21.11+.
 website: https://github.com/wickidcow/SF_HotbarPets
 main: io.github.thebusybiscuit.hotbarpets.HotbarPets
 depend: [Slimefun]
