@@ -26,7 +26,7 @@ The maintained fork replaces the old global Bukkit repeating task with Paper's g
 
 ## Dependency policy
 
-This addon does not directly depend on GuizhanLib and does not use GuizhanLib APIs. Gugu compatibility is provided through the shared Slimefun addon API.
+This maintained fork avoids external Slimefun utility-library dependencies. Gugu compatibility is provided only through the shared Slimefun addon API.
 
 ## Maintenance
 
