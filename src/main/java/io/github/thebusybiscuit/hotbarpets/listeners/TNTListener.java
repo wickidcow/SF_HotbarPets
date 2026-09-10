@@ -28,7 +28,6 @@ public class TNTListener implements Listener {
 
     public TNTListener(HotbarPets plugin) {
         this.plugin = plugin;
-
         plugin.getServer().getPluginManager().registerEvents(this, plugin);
     }
 
@@ -48,26 +47,21 @@ public class TNTListener implements Listener {
 
     @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
     public void onTNTExplode(EntityExplodeEvent e) {
-        if (e.getEntityType() == EntityType.PRIMED_TNT && e.getEntity().hasMetadata(METADATA_KEY)) {
+        if (e.getEntityType() == EntityType.TNT && e.getEntity().hasMetadata(METADATA_KEY)) {
             OfflinePlayer player = Bukkit.getOfflinePlayer((UUID) e.getEntity().getMetadata(METADATA_KEY).get(0).value());
-
-            plugin.getServer().getScheduler().scheduleSyncDelayedTask(plugin, () -> e.getEntity().removeMetadata(METADATA_KEY, plugin), 4);
+            e.getEntity().removeMetadata(METADATA_KEY, plugin);
 
             Iterator<Block> blocks = e.blockList().iterator();
-
             while (blocks.hasNext()) {
-                Block b = blocks.next();
-
-                if (!Slimefun.getProtectionManager().hasPermission(player, b, Interaction.BREAK_BLOCK)) {
+                Block block = blocks.next();
+                if (!Slimefun.getProtectionManager().hasPermission(player, block, Interaction.BREAK_BLOCK)) {
                     blocks.remove();
                 }
             }
 
-            // This is pretty much cancelled if all blocks were protected
             if (e.blockList().isEmpty()) {
                 e.setCancelled(true);
             }
         }
     }
-
 }
