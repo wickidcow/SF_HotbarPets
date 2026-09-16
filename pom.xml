@@ -5,22 +5,18 @@
 
     <groupId>io.github.wickidcow</groupId>
     <artifactId>SF_HotbarPets</artifactId>
-    <version>1.0.1</version>
+    <version>1.0.2</version>
     <name>SF_HotbarPets</name>
     <description>Maintained HotbarPets addon with classic pets plus focused modern Minecraft additions for Slimefun Legacy.</description>
     <url>https://github.com/wickidcow/SF_HotbarPets</url>
     <licenses>
-        <license>
-            <name>GNU General Public License v3.0</name>
-            <url>https://github.com/wickidcow/Slimefun-Legacy/blob/master/LICENSE</url>
-            <distribution>repo</distribution>
-        </license>
+        <license><name>GNU General Public License v3.0</name><url>https://github.com/wickidcow/Slimefun-Legacy/blob/master/LICENSE</url><distribution>repo</distribution></license>
     </licenses>
 
     <properties>
         <maven.compiler.release>21</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <paper.version>[26.2.build,)</paper.version>
+        <paper.version>1.21.11-R0.1-SNAPSHOT</paper.version>
         <slimefun.groupId>com.github.Slimefun</slimefun.groupId>
         <slimefun.artifactId>Slimefun4</slimefun.artifactId>
         <slimefun.version>RC-37</slimefun.version>
@@ -40,7 +36,7 @@
             <resource><directory>${project.basedir}</directory><filtering>false</filtering><includes><include>LICENSE</include></includes></resource>
         </resources>
         <plugins>
-            <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-compiler-plugin</artifactId><version>3.15.0</version></plugin>
+            <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-compiler-plugin</artifactId><version>3.15.0</version><configuration><release>${maven.compiler.release}</release></configuration></plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId><artifactId>maven-shade-plugin</artifactId><version>3.6.2</version>
                 <configuration>
@@ -57,10 +53,7 @@
         <dependency><groupId>io.papermc.paper</groupId><artifactId>paper-api</artifactId><version>${paper.version}</version><scope>provided</scope></dependency>
         <dependency>
             <groupId>${slimefun.groupId}</groupId><artifactId>${slimefun.artifactId}</artifactId><version>${slimefun.version}</version><scope>provided</scope>
-            <exclusions>
-                <exclusion><groupId>io.papermc.paper</groupId><artifactId>paper-api</artifactId></exclusion>
-                <exclusion><groupId>org.spigotmc</groupId><artifactId>spigot-api</artifactId></exclusion>
-            </exclusions>
+            <exclusions><exclusion><groupId>io.papermc.paper</groupId><artifactId>paper-api</artifactId></exclusion><exclusion><groupId>org.spigotmc</groupId><artifactId>spigot-api</artifactId></exclusion></exclusions>
         </dependency>
         <dependency><groupId>org.bstats</groupId><artifactId>bstats-bukkit</artifactId><version>${bstats.version}</version></dependency>
         <dependency><groupId>com.google.code.findbugs</groupId><artifactId>jsr305</artifactId><version>3.0.2</version><scope>provided</scope></dependency>
