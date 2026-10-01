@@ -14,7 +14,7 @@ env:
   ARTIFACT_VERSION: "1.0.2"
   OUTPUT_NAME: "SF_HotbarPets1.0.2.jar"
   MAIN_CLASS: "io.github.thebusybiscuit.hotbarpets.HotbarPets"
-  SLIMEFUN_LEGACY_VERSION: "4.1.48"
+  SLIMEFUN_LEGACY_VERSION: "4.1.61"
 
 concurrency:
   group: sf-hotbarpets-${{ github.workflow }}-${{ github.ref }}
@@ -53,6 +53,8 @@ jobs:
           grep -Fq 'copper-golem:' src/main/resources/config.yml
           grep -Fq 'nautilus:' src/main/resources/config.yml
           grep -Fq 'breeze:' src/main/resources/config.yml
+          grep -Fq 'PetEntityData.setTntOwner' src/main/java/io/github/thebusybiscuit/hotbarpets/pets/CreeperPet.java
+          grep -Fq 'PetEntityData.markProjectile' src/main/java/io/github/thebusybiscuit/hotbarpets/pets/ShulkerPet.java
       - name: Verify Paper 1.21.11 baseline
         run: >-
           mvn -B -Dmaven.test.skip=true clean package
@@ -67,10 +69,10 @@ jobs:
           -Dslimefun.groupId=com.github.slimefun
           -Dslimefun.artifactId=Slimefun
           -Dslimefun.version="${SLIMEFUN_LEGACY_VERSION}"
-      - name: Verify Paper 26.3 alpha compatibility
+      - name: Verify Paper 26.3 compatibility
         run: >-
           mvn -B -Dmaven.test.skip=true clean package
-          -Dpaper.version=26.3-rc-3.build.1-alpha
+          -Dpaper.version=26.3.build.140-beta
           -Dslimefun.groupId=com.github.slimefun
           -Dslimefun.artifactId=Slimefun
           -Dslimefun.version="${SLIMEFUN_LEGACY_VERSION}"
@@ -119,5 +121,5 @@ jobs:
               gh release upload "$TAG" "$JAR" --repo "$GITHUB_REPOSITORY"
             fi
           else
-            gh release create "$TAG" "$JAR" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "SF_HotbarPets $TAG" --notes "HotbarPets 1.0.2 adds Paper 26.3 alpha compatibility validation while retaining the Paper 1.21.11 / Java 21 universal release baseline, Paper 26.2 primary compatibility, and the existing Breeze, Copper Golem and Nautilus pet additions."
+            gh release create "$TAG" "$JAR" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "SF_HotbarPets $TAG" --notes "HotbarPets 1.0.2 validates against current Slimefun Legacy and Paper 26.3 while preserving the Paper 1.21.11 / Java 21 universal release baseline and classic pet behavior."
           fi
