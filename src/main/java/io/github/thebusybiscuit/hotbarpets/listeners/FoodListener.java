@@ -1,6 +1,10 @@
 package io.github.thebusybiscuit.hotbarpets.listeners;
 
-import org.bukkit.ChatColor;
+import io.github.thebusybiscuit.hotbarpets.HotbarPet;
+import io.github.thebusybiscuit.hotbarpets.HotbarPets;
+import io.github.thebusybiscuit.slimefun4.api.items.SlimefunItem;
+import io.github.thebusybiscuit.slimefun4.utils.SlimefunUtils;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
@@ -10,12 +14,9 @@ import org.bukkit.event.player.PlayerItemConsumeEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.potion.PotionEffectType;
 
-import io.github.thebusybiscuit.hotbarpets.HotbarPet;
-import io.github.thebusybiscuit.hotbarpets.HotbarPets;
-import io.github.thebusybiscuit.slimefun4.utils.SlimefunUtils;
-import io.github.thebusybiscuit.slimefun4.api.items.SlimefunItem;
-
 public class FoodListener implements Listener {
+
+    private static final LegacyComponentSerializer LEGACY_AMPERSAND = LegacyComponentSerializer.legacyAmpersand();
 
     private final HotbarPets plugin;
     private final HotbarPet pig;
@@ -36,9 +37,10 @@ public class FoodListener implements Listener {
             ItemStack item = p.getInventory().getItem(i);
 
             if (pig != null && SlimefunUtils.isItemSimilar(item, pig.getItem(), true)) {
-
                 if (!p.getInventory().containsAtLeast(pig.getFavouriteFood(), 1)) {
-                    p.sendMessage(ChatColor.translateAlternateColorCodes('&', "&9Your &5Pig Pet &9would have helped you if you did not neglect it by not feeding it :("));
+                    p.sendMessage(LEGACY_AMPERSAND.deserialize(
+                        "&9Your &5Pig Pet &9would have helped you if you did not neglect it by not feeding it :("
+                    ));
                     return;
                 }
 
@@ -48,11 +50,12 @@ public class FoodListener implements Listener {
                     p.removePotionEffect(PotionEffectType.POISON);
                     p.getWorld().playSound(p.getLocation(), Sound.ENTITY_PIG_AMBIENT, 1.0F, 2.0F);
                 }, 2L);
-            } else if (zombie != null && SlimefunUtils.isItemSimilar(e.getItem(), new ItemStack(Material.ROTTEN_FLESH), true) && SlimefunUtils.isItemSimilar(item, zombie.getItem(), true)) {
-                plugin.getServer().getScheduler().scheduleSyncDelayedTask(plugin, () -> p.removePotionEffect(PotionEffectType.HUNGER), 2L);
+            } else if (zombie != null
+                    && SlimefunUtils.isItemSimilar(e.getItem(), new ItemStack(Material.ROTTEN_FLESH), true)
+                    && SlimefunUtils.isItemSimilar(item, zombie.getItem(), true)) {
+                plugin.getServer().getScheduler()
+                    .scheduleSyncDelayedTask(plugin, () -> p.removePotionEffect(PotionEffectType.HUNGER), 2L);
             }
         }
-
     }
-
 }
