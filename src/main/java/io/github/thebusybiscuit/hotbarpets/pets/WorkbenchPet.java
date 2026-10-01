@@ -3,6 +3,7 @@ package io.github.thebusybiscuit.hotbarpets.pets;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.MenuType;
 
 import io.github.thebusybiscuit.hotbarpets.SimpleBasePet;
 import io.github.thebusybiscuit.slimefun4.api.items.ItemGroup;
@@ -16,7 +17,7 @@ public class WorkbenchPet extends SimpleBasePet {
 
     @Override
     public void onUseItem(Player p) {
-        p.openWorkbench(p.getLocation(), true);
+        MenuType.CRAFTING.builder().location(p.getLocation()).checkReachable(false).build(p).open();
         p.getWorld().playSound(p.getLocation(), Sound.BLOCK_WOODEN_BUTTON_CLICK_ON, 1.0F, 2.0F);
     }
 

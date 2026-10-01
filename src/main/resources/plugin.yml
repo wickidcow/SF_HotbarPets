@@ -5,5 +5,5 @@ description: Preserved HotbarPets gameplay with focused modern Minecraft pets fo
 website: https://github.com/wickidcow/SF_HotbarPets
 main: io.github.thebusybiscuit.hotbarpets.HotbarPets
 depend: [Slimefun]
-api-version: '1.21'
+api-version: '1.21.11'
 folia-supported: true
