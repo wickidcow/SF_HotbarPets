@@ -1,10 +1,14 @@
 package io.github.thebusybiscuit.hotbarpets.listeners;
 
+import io.github.thebusybiscuit.hotbarpets.HotbarPets;
+import io.github.thebusybiscuit.hotbarpets.PetEntityData;
+import io.github.thebusybiscuit.slimefun4.implementation.Slimefun;
+import io.github.thebusybiscuit.slimefun4.libraries.dough.protection.Interaction;
 import java.util.Iterator;
 import java.util.UUID;
-
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.block.Block;
 import org.bukkit.entity.EntityType;
@@ -16,13 +20,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
 
-import io.github.thebusybiscuit.hotbarpets.HotbarPets;
-import io.github.thebusybiscuit.slimefun4.implementation.Slimefun;
-import io.github.thebusybiscuit.slimefun4.libraries.dough.protection.Interaction;
-
 public class TNTListener implements Listener {
-
-    private static final String METADATA_KEY = "hotbarpets_player";
 
     private final HotbarPets plugin;
 
@@ -33,35 +31,49 @@ public class TNTListener implements Listener {
 
     @EventHandler
     public void onTNTDamage(EntityDamageByEntityEvent e) {
-        if (e.getEntity() instanceof Player && e.getDamager() instanceof TNTPrimed && e.getDamager().hasMetadata(METADATA_KEY)) {
-            Player attacker = Bukkit.getPlayer((UUID) e.getDamager().getMetadata(METADATA_KEY).get(0).value());
+        if (!(e.getEntity() instanceof Player) || !(e.getDamager() instanceof TNTPrimed tnt)) {
+            return;
+        }
 
-            if (attacker == null) {
-                e.setCancelled(true);
-            } else if (!Slimefun.getProtectionManager().hasPermission(attacker, e.getEntity().getLocation(), Interaction.ATTACK_PLAYER)) {
-                e.setCancelled(true);
-                attacker.sendMessage(ChatColor.DARK_RED + "You cannot harm Players in here!");
-            }
+        UUID ownerId = PetEntityData.getTntOwner(plugin, tnt);
+        if (ownerId == null) {
+            return;
+        }
+
+        Player attacker = Bukkit.getPlayer(ownerId);
+        if (attacker == null) {
+            e.setCancelled(true);
+        } else if (!Slimefun.getProtectionManager()
+                .hasPermission(attacker, e.getEntity().getLocation(), Interaction.ATTACK_PLAYER)) {
+            e.setCancelled(true);
+            attacker.sendMessage(Component.text("You cannot harm Players in here!", NamedTextColor.DARK_RED));
         }
     }
 
     @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
     public void onTNTExplode(EntityExplodeEvent e) {
-        if (e.getEntityType() == EntityType.TNT && e.getEntity().hasMetadata(METADATA_KEY)) {
-            OfflinePlayer player = Bukkit.getOfflinePlayer((UUID) e.getEntity().getMetadata(METADATA_KEY).get(0).value());
-            e.getEntity().removeMetadata(METADATA_KEY, plugin);
+        if (e.getEntityType() != EntityType.TNT) {
+            return;
+        }
 
-            Iterator<Block> blocks = e.blockList().iterator();
-            while (blocks.hasNext()) {
-                Block block = blocks.next();
-                if (!Slimefun.getProtectionManager().hasPermission(player, block, Interaction.BREAK_BLOCK)) {
-                    blocks.remove();
-                }
-            }
+        UUID ownerId = PetEntityData.getTntOwner(plugin, e.getEntity());
+        if (ownerId == null) {
+            return;
+        }
 
-            if (e.blockList().isEmpty()) {
-                e.setCancelled(true);
+        OfflinePlayer player = Bukkit.getOfflinePlayer(ownerId);
+        PetEntityData.clearTntOwner(plugin, e.getEntity());
+
+        Iterator<Block> blocks = e.blockList().iterator();
+        while (blocks.hasNext()) {
+            Block block = blocks.next();
+            if (!Slimefun.getProtectionManager().hasPermission(player, block, Interaction.BREAK_BLOCK)) {
+                blocks.remove();
             }
+        }
+
+        if (e.blockList().isEmpty()) {
+            e.setCancelled(true);
         }
     }
 }
