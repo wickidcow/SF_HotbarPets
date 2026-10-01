@@ -25,6 +25,7 @@ class PetEntityDataTest {
         var server = MockBukkit.mock();
         plugin = mock(HotbarPets.class);
         when(plugin.getName()).thenReturn("HotbarPets");
+        when(plugin.namespace()).thenReturn("hotbarpets");
         entity = server.addPlayer();
         marker = new NamespacedKey(plugin, "hotbarpets_projectile");
         ownerKey = new NamespacedKey(plugin, "hotbarpets_player");
