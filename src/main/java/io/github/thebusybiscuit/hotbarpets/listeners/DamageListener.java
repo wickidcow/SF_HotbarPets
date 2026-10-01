@@ -1,8 +1,11 @@
 package io.github.thebusybiscuit.hotbarpets.listeners;
 
+import io.github.thebusybiscuit.hotbarpets.HotbarPet;
+import io.github.thebusybiscuit.hotbarpets.HotbarPets;
+import io.github.thebusybiscuit.slimefun4.api.items.SlimefunItem;
+import io.github.thebusybiscuit.slimefun4.utils.SlimefunUtils;
 import java.util.concurrent.ThreadLocalRandom;
-
-import org.bukkit.ChatColor;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -11,12 +14,9 @@ import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.potion.PotionEffectType;
 
-import io.github.thebusybiscuit.hotbarpets.HotbarPet;
-import io.github.thebusybiscuit.hotbarpets.HotbarPets;
-import io.github.thebusybiscuit.slimefun4.utils.SlimefunUtils;
-import io.github.thebusybiscuit.slimefun4.api.items.SlimefunItem;
-
 public class DamageListener implements Listener {
+
+    private static final LegacyComponentSerializer LEGACY_AMPERSAND = LegacyComponentSerializer.legacyAmpersand();
 
     private final HotbarPet creeper;
     private final HotbarPet magmacube;
@@ -40,13 +40,14 @@ public class DamageListener implements Listener {
 
     @EventHandler
     public void onDamage(EntityDamageEvent e) {
-        if (e.getEntity() instanceof Player) {
-            Player p = (Player) e.getEntity();
+        if (!(e.getEntity() instanceof Player p)) {
+            return;
+        }
 
-            for (int i = 0; i < 9; ++i) {
-                ItemStack item = p.getInventory().getItem(i);
+        for (int i = 0; i < 9; ++i) {
+            ItemStack item = p.getInventory().getItem(i);
 
-                switch (e.getCause()) {
+            switch (e.getCause()) {
                 case ENTITY_EXPLOSION:
                 case BLOCK_EXPLOSION:
                     if (creeper != null && SlimefunUtils.isItemSimilar(item, creeper.getItem(), true)) {
@@ -61,7 +62,9 @@ public class DamageListener implements Listener {
                 case LAVA:
                     if (magmacube != null && SlimefunUtils.isItemSimilar(item, magmacube.getItem(), true)) {
                         if (!p.getInventory().containsAtLeast(magmacube.getFavouriteFood(), 1)) {
-                            p.sendMessage(ChatColor.translateAlternateColorCodes('&', "&9Your &4Magma Cube Pet &9would have helped you if you did not neglect it by not feeding it :("));
+                            p.sendMessage(LEGACY_AMPERSAND.deserialize(
+                                "&9Your &4Magma Cube Pet &9would have helped you if you did not neglect it by not feeding it :("
+                            ));
                             return;
                         }
 
@@ -127,7 +130,6 @@ public class DamageListener implements Listener {
                     break;
                 default:
                     break;
-                }
             }
         }
     }
