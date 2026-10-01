@@ -1,125 +1,109 @@
 name: Build SF_HotbarPets
-
 on:
   push:
     branches: ['**']
     tags: ['v*']
   pull_request:
   workflow_dispatch:
-
 permissions:
   contents: write
-
 env:
-  ARTIFACT_VERSION: "1.0.2"
-  OUTPUT_NAME: "SF_HotbarPets1.0.2.jar"
-  MAIN_CLASS: "io.github.thebusybiscuit.hotbarpets.HotbarPets"
-  SLIMEFUN_LEGACY_VERSION: "4.1.61"
-
+  ARTIFACT_VERSION: '1.0.3'
+  OUTPUT_NAME: SF_HotbarPets1.0.3.jar
+  SLIMEFUN_LEGACY_VERSION: '4.1.63'
 concurrency:
   group: sf-hotbarpets-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
-
 jobs:
   build:
-    name: Build and publish SF_HotbarPets1.0.2.jar
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v6
-      - name: Set up Java 25
-        uses: actions/setup-java@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '25'
           cache: maven
-      - name: Install Slimefun Legacy locally
+      - name: Install checksum-verified stable core API
         env:
           GH_TOKEN: ${{ github.token }}
-        shell: bash
         run: |
           set -euo pipefail
           mkdir -p .deps
           gh release download "v${SLIMEFUN_LEGACY_VERSION}" --repo wickidcow/Slimefun-Legacy --pattern "Slimefun-Legacy${SLIMEFUN_LEGACY_VERSION}.jar" --dir .deps
-          mvn -B install:install-file -Dfile=".deps/Slimefun-Legacy${SLIMEFUN_LEGACY_VERSION}.jar" -DgroupId=com.github.slimefun -DartifactId=Slimefun -Dversion="${SLIMEFUN_LEGACY_VERSION}" -Dpackaging=jar -DgeneratePom=true
-      - name: Verify maintained metadata
-        shell: bash
+          printf '%s  %s\n' 993b257c54efe19b58cc8f4946d4d39387f7787fe263c9f27123343159344c42 ".deps/Slimefun-Legacy${SLIMEFUN_LEGACY_VERSION}.jar" | sha256sum --check
+          mvn -B -ntp install:install-file -Dfile=".deps/Slimefun-Legacy${SLIMEFUN_LEGACY_VERSION}.jar" -DgroupId=com.github.slimefun -DartifactId=Slimefun -Dversion="${SLIMEFUN_LEGACY_VERSION}" -Dpackaging=jar -DgeneratePom=true
+      - name: Compile supported Paper API lines
         run: |
           set -euo pipefail
-          grep -Fq '<version>1.0.2</version>' pom.xml
-          grep -Fq '<paper.version>1.21.11-R0.1-SNAPSHOT</paper.version>' pom.xml
-          grep -Fq '<finalName>SF_HotbarPets${project.version}</finalName>' pom.xml
-          grep -Fq '<maven.compiler.release>21</maven.compiler.release>' pom.xml
-          grep -Fq 'copper-golem:' src/main/resources/config.yml
-          grep -Fq 'nautilus:' src/main/resources/config.yml
-          grep -Fq 'breeze:' src/main/resources/config.yml
-          grep -Fq 'PetEntityData.setTntOwner' src/main/java/io/github/thebusybiscuit/hotbarpets/pets/CreeperPet.java
-          grep -Fq 'PetEntityData.markProjectile' src/main/java/io/github/thebusybiscuit/hotbarpets/pets/ShulkerPet.java
-      - name: Verify Paper 1.21.11 baseline
-        run: >-
-          mvn -B -Dmaven.test.skip=true clean package
-          -Dpaper.version=1.21.11-R0.1-SNAPSHOT
-          -Dslimefun.groupId=com.github.slimefun
-          -Dslimefun.artifactId=Slimefun
-          -Dslimefun.version="${SLIMEFUN_LEGACY_VERSION}"
-      - name: Verify Paper 26.2 primary compatibility
-        run: >-
-          mvn -B -Dmaven.test.skip=true clean package
-          -Dpaper.version=26.2.build.112-stable
-          -Dslimefun.groupId=com.github.slimefun
-          -Dslimefun.artifactId=Slimefun
-          -Dslimefun.version="${SLIMEFUN_LEGACY_VERSION}"
-      - name: Verify Paper 26.3 compatibility
-        run: >-
-          mvn -B -Dmaven.test.skip=true clean package
-          -Dpaper.version=26.3.build.140-beta
-          -Dslimefun.groupId=com.github.slimefun
-          -Dslimefun.artifactId=Slimefun
-          -Dslimefun.version="${SLIMEFUN_LEGACY_VERSION}"
-      - name: Build universal release JAR from 1.21.11 baseline
-        run: >-
-          mvn -B -Dmaven.test.skip=true clean package
-          -Dpaper.version=1.21.11-R0.1-SNAPSHOT
-          -Dslimefun.groupId=com.github.slimefun
-          -Dslimefun.artifactId=Slimefun
-          -Dslimefun.version="${SLIMEFUN_LEGACY_VERSION}"
-      - name: Stage and validate versioned JAR
-        shell: bash
+          for API in 1.21.11-R0.1-SNAPSHOT 26.2.build.112-stable 26.3.build.140-beta; do
+            mvn -B -ntp -DskipTests "-Dpaper.version=$API" clean package
+          done
+      - name: Full baseline tests and independent reproducible build
         run: |
           set -euo pipefail
-          mkdir -p dist
-          cp "target/${OUTPUT_NAME}" "dist/${OUTPUT_NAME}"
-          JAR="dist/${OUTPUT_NAME}"
-          unzip -tqq "$JAR"
-          unzip -p "$JAR" plugin.yml | grep -Fq "version: ${ARTIFACT_VERSION}"
-          javap -verbose -classpath "$JAR" "$MAIN_CLASS" | grep -Fq 'major version: 65'
-          if jar tf "$JAR" | grep -q '^io/github/thebusybiscuit/slimefun4/'; then echo 'Slimefun core classes must not be bundled.' >&2; exit 1; fi
-          if jar tf "$JAR" | grep -Eqi '(^|/)net/guizhanss/guizhanlib|(^|/)guizhanlib'; then echo 'External Slimefun utility-library classes must not be bundled.' >&2; exit 1; fi
-          sha256sum "$JAR"
-      - name: Upload raw JAR artifact
+          mvn -B -ntp -Dpaper.version=1.21.11-R0.1-SNAPSHOT clean verify
+          mkdir -p dist test-evidence
+          cp target/surefire-reports/TEST-*.xml test-evidence/
+          cp "target/$OUTPUT_NAME" "dist/$OUTPUT_NAME"
+          mvn -B -ntp -DskipTests -Dpaper.version=1.21.11-R0.1-SNAPSHOT clean package
+          cmp "target/$OUTPUT_NAME" "dist/$OUTPUT_NAME"
+      - name: Validate exact reports and installable archive
+        run: |
+          python3 - <<'PY'
+          import os,re,zipfile,xml.etree.ElementTree as ET
+          from pathlib import Path
+          reports=[ET.parse(p).getroot() for p in Path('test-evidence').glob('TEST-*.xml')]
+          assert sum(int(r.attrib['tests']) for r in reports)==13
+          assert all(int(r.attrib[k])==0 for r in reports for k in ('failures','errors','skipped'))
+          with zipfile.ZipFile('dist/'+os.environ['OUTPUT_NAME']) as jar:
+              assert jar.testzip() is None
+              descriptor=jar.read('plugin.yml').decode()
+              assert re.search(r'(?m)^version:\s*[\'\"]?'+re.escape(os.environ['ARTIFACT_VERSION'])+r'[\'\"]?\s*$',descriptor)
+              assert "api-version: '1.21.11'" in descriptor or 'api-version: 1.21.11' in descriptor
+              for name in jar.namelist():
+                  assert not name.startswith(('org/junit/','org/mockito/','org/mockbukkit/','net/bytebuddy/','io/github/thebusybiscuit/slimefun4/','net/guizhanss/guizhanlib/')),name
+                  if name.endswith('.class') and not name.startswith('META-INF/versions/'):
+                      data=jar.read(name);assert data[:4]==b'\xca\xfe\xba\xbe'
+                      assert int.from_bytes(data[6:8],'big')<=65 and int.from_bytes(data[4:6],'big')!=65535,name
+          PY
+          sha256sum "dist/$OUTPUT_NAME"
+      - name: Retain actual regression reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: addon-regression-reports
+          path: |
+            test-evidence/TEST-*.xml
+            target/surefire-reports/TEST-*.xml
+          retention-days: 14
+          if-no-files-found: warn
+      - name: Upload raw JAR
         uses: actions/upload-artifact@v7
         with:
           name: ${{ env.OUTPUT_NAME }}
           path: dist/${{ env.OUTPUT_NAME }}
           archive: false
           if-no-files-found: error
-      - name: Publish immutable versioned release JAR
+      - name: Publish immutable new release
         if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/') || github.ref_name == github.event.repository.default_branch
         env:
           GH_TOKEN: ${{ github.token }}
-        shell: bash
         run: |
           set -euo pipefail
-          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then TAG="$GITHUB_REF_NAME"; else TAG="v${ARTIFACT_VERSION}"; fi
-          JAR="dist/${OUTPUT_NAME}"
-          EXPECTED="sha256:$(sha256sum "$JAR" | awk '{print $1}')"
+          TAG="v${ARTIFACT_VERSION}"
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then test "$GITHUB_REF_NAME" = "$TAG"; fi
+          EXPECTED="sha256:$(sha256sum "dist/$OUTPUT_NAME" | awk '{print $1}')"
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            EXISTING="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" --jq ".assets[] | select(.name == \"${OUTPUT_NAME}\") | .digest" | head -n 1 || true)"
+            EXISTING="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" --jq ".assets[] | select(.name == \"$OUTPUT_NAME\") | .digest")"
             if [[ -n "$EXISTING" ]]; then
-              [[ "$EXISTING" == "$EXPECTED" ]] || { echo "Different bytes already exist for $OUTPUT_NAME; bump version." >&2; exit 1; }
+              test "$EXISTING" = "$EXPECTED" || { echo 'Published bytes differ; use a new version.' >&2; exit 1; }
             else
-              gh release upload "$TAG" "$JAR" --repo "$GITHUB_REPOSITORY"
+              gh release upload "$TAG" "dist/$OUTPUT_NAME" --repo "$GITHUB_REPOSITORY"
             fi
           else
-            gh release create "$TAG" "$JAR" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "SF_HotbarPets $TAG" --notes "HotbarPets 1.0.2 validates against current Slimefun Legacy and Paper 26.3 while preserving the Paper 1.21.11 / Java 21 universal release baseline and classic pet behavior."
+            gh release create "$TAG" "dist/$OUTPUT_NAME" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "HotbarPets $ARTIFACT_VERSION" --notes 'Publishes the merged entity-data/presentation fixes under a new immutable version. Replaces deprecated workbench opening with the supported crafting menu API while retaining forced access, default title and sound. Thirteen regression tests protect current and legacy entity markers and ownership. Existing pet IDs, recipes and food requirements remain unchanged. Paper 26.3 is primary; the 1.21.11/Java 21 baseline is retained. Tests do not certify every live-world or Folia behavior.'
           fi

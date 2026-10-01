@@ -1,72 +1,44 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
-
-    <groupId>io.github.wickidcow</groupId>
-    <artifactId>SF_HotbarPets</artifactId>
-    <version>1.0.2</version>
+    <groupId>io.github.wickidcow</groupId><artifactId>SF_HotbarPets</artifactId><version>1.0.3</version>
     <name>SF_HotbarPets</name>
     <description>Maintained HotbarPets addon with classic pets plus focused modern Minecraft additions for Slimefun Legacy.</description>
     <url>https://github.com/wickidcow/SF_HotbarPets</url>
-    <licenses>
-        <license><name>GNU General Public License v3.0</name><url>https://github.com/wickidcow/Slimefun-Legacy/blob/master/LICENSE</url><distribution>repo</distribution></license>
-    </licenses>
-
+    <licenses><license><name>GNU General Public License v3.0</name><url>https://github.com/wickidcow/Slimefun-Legacy/blob/master/LICENSE</url><distribution>repo</distribution></license></licenses>
     <properties>
         <maven.compiler.release>21</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.build.outputTimestamp>2026-10-01T00:00:00Z</project.build.outputTimestamp>
         <paper.version>1.21.11-R0.1-SNAPSHOT</paper.version>
-        <slimefun.groupId>com.github.Slimefun</slimefun.groupId>
-        <slimefun.artifactId>Slimefun4</slimefun.artifactId>
-        <slimefun.version>RC-37</slimefun.version>
+        <slimefun.groupId>com.github.slimefun</slimefun.groupId><slimefun.artifactId>Slimefun</slimefun.artifactId><slimefun.version>4.1.63</slimefun.version>
         <bstats.version>3.2.1</bstats.version>
     </properties>
-
     <repositories>
         <repository><id>paper-repo</id><url>https://repo.papermc.io/repository/maven-public/</url></repository>
         <repository><id>jitpack.io</id><url>https://jitpack.io</url></repository>
     </repositories>
-
     <build>
-        <finalName>SF_HotbarPets${project.version}</finalName>
-        <defaultGoal>clean verify</defaultGoal>
+        <finalName>SF_HotbarPets${project.version}</finalName><defaultGoal>clean verify</defaultGoal>
         <resources>
             <resource><directory>src/main/resources</directory><filtering>true</filtering></resource>
             <resource><directory>${project.basedir}</directory><filtering>false</filtering><includes><include>LICENSE</include></includes></resource>
         </resources>
         <plugins>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.15.0</version>
-                <configuration>
-                    <release>${maven.compiler.release}</release>
-                    <showDeprecation>true</showDeprecation>
-                    <compilerArgs>
-                        <arg>-Xlint:deprecation</arg>
-                        <arg>-Xlint:removal</arg>
-                    </compilerArgs>
-                </configuration>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId><artifactId>maven-shade-plugin</artifactId><version>3.6.2</version>
-                <configuration>
-                    <createDependencyReducedPom>false</createDependencyReducedPom>
-                    <relocations><relocation><pattern>org.bstats</pattern><shadedPattern>io.github.thebusybiscuit.hotbarpets.bstats</shadedPattern></relocation></relocations>
-                    <filters><filter><artifact>*:*</artifact><excludes><exclude>META-INF/*.SF</exclude><exclude>META-INF/*.DSA</exclude><exclude>META-INF/*.RSA</exclude></excludes></filter></filters>
-                </configuration>
+            <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-surefire-plugin</artifactId><version>3.5.4</version></plugin>
+            <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-jar-plugin</artifactId><version>3.5.0</version></plugin>
+            <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-compiler-plugin</artifactId><version>3.15.0</version><configuration><release>${maven.compiler.release}</release><showDeprecation>true</showDeprecation><compilerArgs><arg>-Xlint:deprecation</arg><arg>-Xlint:removal</arg></compilerArgs></configuration></plugin>
+            <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-shade-plugin</artifactId><version>3.6.2</version>
+                <configuration><createDependencyReducedPom>false</createDependencyReducedPom><relocations><relocation><pattern>org.bstats</pattern><shadedPattern>io.github.thebusybiscuit.hotbarpets.bstats</shadedPattern></relocation></relocations><filters><filter><artifact>*:*</artifact><excludes><exclude>META-INF/*.SF</exclude><exclude>META-INF/*.DSA</exclude><exclude>META-INF/*.RSA</exclude></excludes></filter></filters></configuration>
                 <executions><execution><phase>package</phase><goals><goal>shade</goal></goals></execution></executions>
             </plugin>
         </plugins>
     </build>
-
     <dependencies>
+        <dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter</artifactId><version>5.14.1</version><scope>test</scope></dependency>
+        <dependency><groupId>org.mockito</groupId><artifactId>mockito-core</artifactId><version>5.18.0</version><scope>test</scope></dependency>
+        <dependency><groupId>org.mockbukkit.mockbukkit</groupId><artifactId>mockbukkit-v1.21</artifactId><version>4.110.0</version><scope>test</scope></dependency>
         <dependency><groupId>io.papermc.paper</groupId><artifactId>paper-api</artifactId><version>${paper.version}</version><scope>provided</scope></dependency>
-        <dependency>
-            <groupId>${slimefun.groupId}</groupId><artifactId>${slimefun.artifactId}</artifactId><version>${slimefun.version}</version><scope>provided</scope>
-            <exclusions><exclusion><groupId>io.papermc.paper</groupId><artifactId>paper-api</artifactId></exclusion><exclusion><groupId>org.spigotmc</groupId><artifactId>spigot-api</artifactId></exclusion></exclusions>
-        </dependency>
+        <dependency><groupId>${slimefun.groupId}</groupId><artifactId>${slimefun.artifactId}</artifactId><version>${slimefun.version}</version><scope>provided</scope><exclusions><exclusion><groupId>io.papermc.paper</groupId><artifactId>paper-api</artifactId></exclusion><exclusion><groupId>org.spigotmc</groupId><artifactId>spigot-api</artifactId></exclusion></exclusions></dependency>
         <dependency><groupId>org.bstats</groupId><artifactId>bstats-bukkit</artifactId><version>${bstats.version}</version></dependency>
         <dependency><groupId>com.google.code.findbugs</groupId><artifactId>jsr305</artifactId><version>3.0.2</version><scope>provided</scope></dependency>
     </dependencies>
