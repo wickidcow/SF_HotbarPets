@@ -10,7 +10,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.build.outputTimestamp>2026-10-01T00:00:00Z</project.build.outputTimestamp>
         <paper.version>1.21.11-R0.1-SNAPSHOT</paper.version>
-        <slimefun.groupId>com.github.slimefun</slimefun.groupId><slimefun.artifactId>Slimefun</slimefun.artifactId><slimefun.version>4.1.63</slimefun.version>
+        <slimefun.groupId>com.github.slimefun</slimefun.groupId><slimefun.artifactId>Slimefun</slimefun.artifactId><slimefun.version>4.1.75</slimefun.version>
         <bstats.version>3.2.1</bstats.version>
     </properties>
     <repositories>

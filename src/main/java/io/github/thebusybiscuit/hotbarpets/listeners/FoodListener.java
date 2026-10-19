@@ -44,17 +44,17 @@ public class FoodListener implements Listener {
                     return;
                 }
 
-                plugin.getServer().getScheduler().scheduleSyncDelayedTask(plugin, () -> {
+                p.getScheduler().runDelayed(plugin, task -> {
                     p.getInventory().removeItem(pig.getFavouriteFood());
                     p.setSaturation(p.getSaturation() + 8.0F);
                     p.removePotionEffect(PotionEffectType.POISON);
                     p.getWorld().playSound(p.getLocation(), Sound.ENTITY_PIG_AMBIENT, 1.0F, 2.0F);
-                }, 2L);
+                }, null, 2L);
             } else if (zombie != null
                     && SlimefunUtils.isItemSimilar(e.getItem(), new ItemStack(Material.ROTTEN_FLESH), true)
                     && SlimefunUtils.isItemSimilar(item, zombie.getItem(), true)) {
-                plugin.getServer().getScheduler()
-                    .scheduleSyncDelayedTask(plugin, () -> p.removePotionEffect(PotionEffectType.HUNGER), 2L);
+                p.getScheduler().runDelayed(
+                    plugin, task -> p.removePotionEffect(PotionEffectType.HUNGER), null, 2L);
             }
         }
     }

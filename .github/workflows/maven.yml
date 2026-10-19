@@ -5,12 +5,23 @@ on:
     tags: ['v*']
   pull_request:
   workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Publish this validated versioned release'
+        required: true
+        type: boolean
+        default: false
+      confirm_version:
+        description: 'Type the exact ARTIFACT_VERSION when publish=true'
+        required: false
+        type: string
+        default: ''
 permissions:
-  contents: write
+  contents: read
 env:
   ARTIFACT_VERSION: '1.0.3'
   OUTPUT_NAME: SF_HotbarPets1.0.3.jar
-  SLIMEFUN_LEGACY_VERSION: '4.1.63'
+  SLIMEFUN_LEGACY_VERSION: '4.1.75'
 concurrency:
   group: sf-hotbarpets-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -34,12 +45,12 @@ jobs:
           set -euo pipefail
           mkdir -p .deps
           gh release download "v${SLIMEFUN_LEGACY_VERSION}" --repo wickidcow/Slimefun-Legacy --pattern "Slimefun-Legacy${SLIMEFUN_LEGACY_VERSION}.jar" --dir .deps
-          printf '%s  %s\n' 993b257c54efe19b58cc8f4946d4d39387f7787fe263c9f27123343159344c42 ".deps/Slimefun-Legacy${SLIMEFUN_LEGACY_VERSION}.jar" | sha256sum --check
+          printf '%s  %s\n' 206cd1e54e81bf7d3968b2b2a4bd698f1271dca9dd474f2aebf4a7a195c1b060 ".deps/Slimefun-Legacy${SLIMEFUN_LEGACY_VERSION}.jar" | sha256sum --check
           mvn -B -ntp install:install-file -Dfile=".deps/Slimefun-Legacy${SLIMEFUN_LEGACY_VERSION}.jar" -DgroupId=com.github.slimefun -DartifactId=Slimefun -Dversion="${SLIMEFUN_LEGACY_VERSION}" -Dpackaging=jar -DgeneratePom=true
       - name: Compile supported Paper API lines
         run: |
           set -euo pipefail
-          for API in 1.21.11-R0.1-SNAPSHOT 26.2.build.112-stable 26.3.build.140-beta; do
+          for API in 1.21.11-R0.1-SNAPSHOT 26.2.build.112-stable 26.3.build.205-stable; do
             mvn -B -ntp -DskipTests "-Dpaper.version=$API" clean package
           done
       - name: Full baseline tests and independent reproducible build
@@ -57,7 +68,7 @@ jobs:
           import os,re,zipfile,xml.etree.ElementTree as ET
           from pathlib import Path
           reports=[ET.parse(p).getroot() for p in Path('test-evidence').glob('TEST-*.xml')]
-          assert sum(int(r.attrib['tests']) for r in reports)==13
+          assert sum(int(r.attrib['tests']) for r in reports)==15
           assert all(int(r.attrib[k])==0 for r in reports for k in ('failures','errors','skipped'))
           with zipfile.ZipFile('dist/'+os.environ['OUTPUT_NAME']) as jar:
               assert jar.testzip() is None
@@ -88,22 +99,53 @@ jobs:
           path: dist/${{ env.OUTPUT_NAME }}
           archive: false
           if-no-files-found: error
-      - name: Publish immutable new release
-        if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/') || github.ref_name == github.event.repository.default_branch
+
+  publish:
+    name: Publish validated immutable HotbarPets release
+    needs: build
+    if: github.event_name == 'workflow_dispatch' && inputs.publish == true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download validated raw JAR
+        uses: actions/download-artifact@v6
+        with:
+          name: ${{ env.OUTPUT_NAME }}
+          path: dist
+
+      - name: Validate explicit release publication request
+        id: release_state
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CONFIRM_VERSION: ${{ inputs.confirm_version }}
+        run: |
+          set -euo pipefail
+          test "$CONFIRM_VERSION" = "$ARTIFACT_VERSION" || {
+            echo "Refusing publication: confirm_version must exactly match ARTIFACT_VERSION ($ARTIFACT_VERSION)." >&2
+            exit 1
+          }
+          JAR="dist/$OUTPUT_NAME"
+          test -s "$JAR"
+          TAG="v${ARTIFACT_VERSION}"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Refusing publication: release $TAG already exists." >&2
+            exit 1
+          fi
+          if git ls-remote --exit-code --tags "https://github.com/${GITHUB_REPOSITORY}.git" "refs/tags/${TAG}" >/dev/null 2>&1; then
+            echo "Refusing publication: tag $TAG already exists." >&2
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Publish canonical raw JAR release asset
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          TAG="v${ARTIFACT_VERSION}"
-          if [[ "$GITHUB_REF" == refs/tags/* ]]; then test "$GITHUB_REF_NAME" = "$TAG"; fi
-          EXPECTED="sha256:$(sha256sum "dist/$OUTPUT_NAME" | awk '{print $1}')"
-          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            EXISTING="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" --jq ".assets[] | select(.name == \"$OUTPUT_NAME\") | .digest")"
-            if [[ -n "$EXISTING" ]]; then
-              test "$EXISTING" = "$EXPECTED" || { echo 'Published bytes differ; use a new version.' >&2; exit 1; }
-            else
-              gh release upload "$TAG" "dist/$OUTPUT_NAME" --repo "$GITHUB_REPOSITORY"
-            fi
-          else
-            gh release create "$TAG" "dist/$OUTPUT_NAME" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "HotbarPets $ARTIFACT_VERSION" --notes 'Publishes the merged entity-data/presentation fixes under a new immutable version. Replaces deprecated workbench opening with the supported crafting menu API while retaining forced access, default title and sound. Thirteen regression tests protect current and legacy entity markers and ownership. Existing pet IDs, recipes and food requirements remain unchanged. Paper 26.3 is primary; the 1.21.11/Java 21 baseline is retained. Tests do not certify every live-world or Folia behavior.'
-          fi
+          TAG="${{ steps.release_state.outputs.tag }}"
+          test -n "$TAG"
+          JAR="dist/$OUTPUT_NAME"
+          test -s "$JAR"
+          gh release create "$TAG" "$JAR" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "HotbarPets $ARTIFACT_VERSION" --notes 'Publishes the reviewed Folia/Paper compatibility release. Player food effects use the owning entity scheduler, existing pet IDs/recipes/food requirements are unchanged, and the 1.21.11/Java 21 floor is retained.'
+
