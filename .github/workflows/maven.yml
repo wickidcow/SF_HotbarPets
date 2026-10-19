@@ -50,7 +50,7 @@ jobs:
       - name: Compile supported Paper API lines
         run: |
           set -euo pipefail
-          for API in 1.21.11-R0.1-SNAPSHOT 26.2.build.112-stable 26.3.build.+; do
+          for API in 1.21.11-R0.1-SNAPSHOT 26.2.build.112-stable 26.3.build.205-stable; do
             mvn -B -ntp -DskipTests "-Dpaper.version=$API" clean package
           done
       - name: Full baseline tests and independent reproducible build
