@@ -36,7 +36,7 @@ public class FoodListener implements Listener {
         for (int i = 0; i < 9; ++i) {
             ItemStack item = p.getInventory().getItem(i);
 
-            if (pig != null && SlimefunUtils.isItemSimilar(item, pig.getItem(), true)) {
+            if (pig != null && pig.canUse(p) && SlimefunUtils.isItemSimilar(item, pig.getItem(), true)) {
                 if (!p.getInventory().containsAtLeast(pig.getFavouriteFood(), 1)) {
                     p.sendMessage(LEGACY_AMPERSAND.deserialize(
                         "&9Your &5Pig Pet &9would have helped you if you did not neglect it by not feeding it :("
@@ -45,12 +45,15 @@ public class FoodListener implements Listener {
                 }
 
                 p.getScheduler().runDelayed(plugin, task -> {
+                    if (!pig.canUse(p)) {
+                        return;
+                    }
                     p.getInventory().removeItem(pig.getFavouriteFood());
                     p.setSaturation(p.getSaturation() + 8.0F);
                     p.removePotionEffect(PotionEffectType.POISON);
                     p.getWorld().playSound(p.getLocation(), Sound.ENTITY_PIG_AMBIENT, 1.0F, 2.0F);
                 }, null, 2L);
-            } else if (zombie != null
+            } else if (zombie != null && zombie.canUse(p)
                     && SlimefunUtils.isItemSimilar(e.getItem(), new ItemStack(Material.ROTTEN_FLESH), true)
                     && SlimefunUtils.isItemSimilar(item, zombie.getItem(), true)) {
                 p.getScheduler().runDelayed(
