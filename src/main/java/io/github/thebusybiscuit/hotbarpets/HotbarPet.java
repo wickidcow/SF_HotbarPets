@@ -17,6 +17,10 @@ import org.bukkit.plugin.java.JavaPlugin;
 public class HotbarPet extends SlimefunItem {
 
     private static final long MESSAGE_DELAY = 2000;
+
+    // Keep the wording and leading space consistent across all hungry-pet messages.
+    public static final String HUNGRY_MESSAGE =
+            " would have helped you, but it's hungry! Keep its favorite food in your inventory.";
     private static final Map<UUID, Long> messageDelay = new HashMap<>();
     private static final LegacyComponentSerializer LEGACY_SECTION = LegacyComponentSerializer.legacySection();
 
@@ -75,7 +79,7 @@ public class HotbarPet extends SlimefunItem {
                     Component.text("Your ", NamedTextColor.BLUE)
                         .append(LEGACY_SECTION.deserialize(getItemName()))
                         .append(Component.text(
-                            "would have helped you if you did not neglect it by not feeding it :(",
+                            HUNGRY_MESSAGE,
                             NamedTextColor.BLUE
                         ))
                 );
