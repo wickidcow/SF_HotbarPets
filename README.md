@@ -40,6 +40,39 @@ Built with **Java 25** targeting **Java 21 bytecode**. Slimefun Legacy is the pr
 
 This maintained fork has no direct GuizhanLib dependency.
 
+## Optional per-pet ability permissions (Albion pet shop)
+
+The addon can optionally restrict the **use of each Hotbar Pet ability** to a
+specific permission, independently of Slimefun research, crafting, item ownership
+or player hotbar slots. Existing servers are unchanged unless they opt in.
+
+```yaml
+# plugins/HotbarPets/config.yml
+permission-gating:
+  enabled: true
+  prefix: 'albion.hotbarpet.'
+```
+
+Permission names use the registered Slimefun ID without `HOTBAR_PET_`, in
+lowercase: `HOTBAR_PET_COW` requires `albion.hotbarpet.cow`,
+`HOTBAR_PET_ENDER_MAN` requires `albion.hotbarpet.ender_man` and
+`HOTBAR_PET_DRAGON` requires `albion.hotbarpet.dragon`.
+Grant nodes with LuckPerms, e.g.:
+
+```text
+lp user ExamplePlayer permission set albion.hotbarpet.cow true
+```
+
+Both click-activated and passive hotbar abilities are checked, including the
+Magma Cube lava shield, Pig/Zombie food effects and Eyamaz Soul Pie drop.
+The pet's preferred food is still consumed normally after the permission check.
+
+This mechanism is designed to work with Albion's BetonQuest NPC #132, which
+can give the real Slimefun Hotbar Pet item and grant its individual permission
+after a successful purchase. Bukkit operators may satisfy permissions by
+default; test unlocks with a regular non-OP player. The item can still be
+traded or crafted even when the recipient cannot use its power.
+
 ## Credits and project lineage
 
 Original HotbarPets project and authorship belong to **TheBusyBiscuit** and its contributors. Modern compatibility and Slimefun Legacy maintenance are by **wickidcow**. This fork preserves upstream authorship and does not claim the original work as its own.
