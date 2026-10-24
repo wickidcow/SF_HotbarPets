@@ -34,11 +34,15 @@ All three can be disabled independently in `config.yml`. The classic producer-pe
 
 ## Download and compatibility
 
-Release JAR: `SF_HotbarPets1.0.1.jar`
+Release JAR naming: `SF_HotbarPets1.0.4.jar` (the v1.0.4 source bump does not itself publish a GitHub release).
 
 Built with **Java 25** targeting **Java 21 bytecode**. Slimefun Legacy is the primary target, with the shared Slimefun addon API retained for Slimefun United, SlimefunGuguProject/Slimefun4 and original Slimefun4-compatible implementations. Paper is primary; Purpur, Folia and Leaf are compatibility targets.
 
 This maintained fork has no direct GuizhanLib dependency.
+
+## 1.0.4 — pet-food messages and optional ability permissions
+
+Hungry Hotbar Pets now explain how to feed them: **“Your [Pet Name] would have helped you, but it's hungry! Keep its favorite food in your inventory.”** The notification preserves the pet name's colored text, fixes missing spaces, and shares one string with special-case Pig and Magma Cube reminders.
 
 ## Optional per-pet ability permissions (Albion pet shop)
 
