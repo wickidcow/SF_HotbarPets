@@ -31,7 +31,7 @@ public class SoulPieListener implements Listener {
             for (int i = 0; i < 9; ++i) {
                 ItemStack item = p.getInventory().getItem(i);
 
-                if (eyamaz != null && SlimefunUtils.isItemSimilar(item, eyamaz.getItem(), true)) {
+                if (eyamaz != null && eyamaz.canUse(p) && SlimefunUtils.isItemSimilar(item, eyamaz.getItem(), true)) {
                     e.getEntity().getLocation().getWorld().dropItemNaturally(e.getEntity().getLocation(), new CustomItemStack(new ItemStack(Material.PUMPKIN_PIE), "&bSoul Pie"));
                 }
             }
