@@ -56,8 +56,14 @@ public class FoodListener implements Listener {
             } else if (zombie != null && zombie.canUse(p)
                     && SlimefunUtils.isItemSimilar(e.getItem(), new ItemStack(Material.ROTTEN_FLESH), true)
                     && SlimefunUtils.isItemSimilar(item, zombie.getItem(), true)) {
-                p.getScheduler().runDelayed(
-                    plugin, task -> p.removePotionEffect(PotionEffectType.HUNGER), null, 2L);
+                p.getScheduler().runDelayed(plugin, task -> {
+                    // Permissions can change before this delayed Folia-owned
+                    // callback executes; keep Zombie consistent with Pig.
+                    if (!zombie.canUse(p)) {
+                        return;
+                    }
+                    p.removePotionEffect(PotionEffectType.HUNGER);
+                }, null, 2L);
             }
         }
     }
