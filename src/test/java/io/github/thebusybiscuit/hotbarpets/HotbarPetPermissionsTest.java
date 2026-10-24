@@ -24,6 +24,11 @@ class HotbarPetPermissionsTest {
                 HotbarPetPermissions.permissionFor("HOTBAR_PET_DRAGON", " "));
     }
 
+    @Test void hungryMessageAlwaysStartsWithASpaceAndExplainsTheFoodRequirement() {
+        assertEquals(" would have helped you, but it's hungry! Keep its favorite food in your inventory.",
+                HotbarPet.HUNGRY_MESSAGE);
+    }
+
     @Test void identifiersMustBeRealHotbarPetIds() {
         assertThrows(IllegalArgumentException.class, () ->
                 HotbarPetPermissions.permissionFor("MCPETS_DRAGON", null));
