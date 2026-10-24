@@ -29,6 +29,25 @@ class FoodListenerFoliaContractTest {
     }
 
     @Test
+    void delayedFoodEffectsRecheckOptionalAbilityPermissionsBeforeApplying() throws IOException {
+        String source = Files.readString(SOURCE);
+        int first = source.indexOf("p.getScheduler().runDelayed");
+        int second = source.indexOf("p.getScheduler().runDelayed", first + 1);
+
+        assertTrue(first >= 0 && second > first, "Both Pig and Zombie effects must stay scheduled");
+        String pigCallback = source.substring(first, second);
+        String zombieCallback = source.substring(second);
+
+        assertTrue(pigCallback.contains("if (!pig.canUse(p))"),
+            "Pig must continue checking permission when the delayed effect executes");
+        assertTrue(zombieCallback.contains("if (!zombie.canUse(p))"),
+            "Zombie must reject a revoked permission before removing Hunger");
+        assertTrue(zombieCallback.indexOf("if (!zombie.canUse(p))")
+                < zombieCallback.indexOf("p.removePotionEffect(PotionEffectType.HUNGER)"),
+            "The recheck must happen before the zombie effect is applied");
+    }
+
+    @Test
     void bothDelayedFoodBranchesRemainEntityOwned() throws IOException {
         String source = Files.readString(SOURCE);
         int first = source.indexOf("p.getScheduler().runDelayed");
