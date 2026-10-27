@@ -182,7 +182,7 @@ jobs:
           test -s "$JAR"
           test "$(stat -c %s "$JAR")" -eq 106454
           printf '%s  %s\n' b494dcdafc0facfdd20d650d83aa8362640e2ac5d8398e7efda35cdf69236096 "$JAR" | sha256sum --check --strict
-          unzip -p "$JAR" plugin.yml | grep -Eq '^version: ["\x27]?1\.0\.4["\x27]?$'
+          unzip -p "$JAR" plugin.yml | grep -Eq "^version: ['\"]?1\.0\.4['\"]?$"
           if gh release view v1.0.4 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo 'Refusing to replace an existing release' >&2
             exit 1
