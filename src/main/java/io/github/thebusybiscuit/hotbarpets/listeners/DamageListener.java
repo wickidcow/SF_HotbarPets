@@ -85,7 +85,8 @@ public class DamageListener implements Listener {
                 case FALL:
                     if (slime != null && SlimefunUtils.isItemSimilar(item, slime.getItem(), true)) {
                         if (!slime.checkAndConsumeFood(p)) {
-                            return;
+                            // A later Cookie Slime may have different food available.
+                            continue;
                         }
 
                         e.setCancelled(true);
@@ -95,7 +96,7 @@ public class DamageListener implements Listener {
 
                     if (mrCookieSlime != null && SlimefunUtils.isItemSimilar(item, mrCookieSlime.getItem(), true)) {
                         if (!mrCookieSlime.checkAndConsumeFood(p)) {
-                            return;
+                            continue;
                         }
 
                         e.setCancelled(true);

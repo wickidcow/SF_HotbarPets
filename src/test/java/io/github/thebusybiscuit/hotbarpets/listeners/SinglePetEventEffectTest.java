@@ -97,6 +97,36 @@ class SinglePetEventEffectTest {
     }
 
     @Test
+    void hungrySlimeDoesNotBlockAnEquippedCookieSlimeFromProtecting() {
+        HotbarPet slime = mock(HotbarPet.class), cookie = mock(HotbarPet.class);
+        SlimefunItemStack slimeItem = mock(SlimefunItemStack.class);
+        SlimefunItemStack cookieItem = mock(SlimefunItemStack.class);
+        ItemStack first = mock(ItemStack.class), second = mock(ItemStack.class);
+        Player p = twoItems(first, second);
+        when(p.getWorld()).thenReturn(mock(World.class));
+        when(p.getLocation()).thenReturn(mock(Location.class));
+        when(slime.getItem()).thenReturn(slimeItem);
+        when(cookie.getItem()).thenReturn(cookieItem);
+        when(slime.checkAndConsumeFood(p)).thenReturn(false);
+        when(cookie.checkAndConsumeFood(p)).thenReturn(true);
+        try (MockedStatic<SlimefunItem> ids = mockStatic(SlimefunItem.class);
+             MockedStatic<SlimefunUtils> similar = mockStatic(SlimefunUtils.class)) {
+            ids.when(() -> SlimefunItem.getById("HOTBAR_PET_SLIME")).thenReturn(slime);
+            ids.when(() -> SlimefunItem.getById("HOTBAR_PET_MRCOOKIESLIME")).thenReturn(cookie);
+            similar.when(() -> SlimefunUtils.isItemSimilar(first, slimeItem, true)).thenReturn(true);
+            similar.when(() -> SlimefunUtils.isItemSimilar(second, cookieItem, true)).thenReturn(true);
+            DamageListener handler = new DamageListener(plugin());
+            EntityDamageEvent event = mock(EntityDamageEvent.class);
+            when(event.getEntity()).thenReturn(p);
+            when(event.getCause()).thenReturn(EntityDamageEvent.DamageCause.FALL);
+            handler.onDamage(event);
+            verify(slime, times(1)).checkAndConsumeFood(p);
+            verify(cookie, times(1)).checkAndConsumeFood(p);
+            verify(event, times(1)).setCancelled(true);
+        }
+    }
+
+    @Test
     void slimeAndCookieSlimeCannotBothChargeForOneFall() {
         HotbarPet slime = mock(HotbarPet.class), cookie = mock(HotbarPet.class);
         SlimefunItemStack slimeItem = mock(SlimefunItemStack.class);

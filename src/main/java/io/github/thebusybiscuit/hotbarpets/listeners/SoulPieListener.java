@@ -33,6 +33,8 @@ public class SoulPieListener implements Listener {
 
                 if (eyamaz != null && eyamaz.canUse(p) && SlimefunUtils.isItemSimilar(item, eyamaz.getItem(), true)) {
                     e.getEntity().getLocation().getWorld().dropItemNaturally(e.getEntity().getLocation(), new CustomItemStack(new ItemStack(Material.PUMPKIN_PIE), "&bSoul Pie"));
+                    // One harvest per kill, regardless of duplicated equipped pets.
+                    break;
                 }
             }
         }
