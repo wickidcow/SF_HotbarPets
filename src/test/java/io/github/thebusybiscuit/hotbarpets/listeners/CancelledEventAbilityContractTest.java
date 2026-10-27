@@ -26,6 +26,15 @@ class CancelledEventAbilityContractTest {
     }
 
     @Test
+    void magmaOptionalDebitIsCheckedAndNeverStorageOnly() throws Exception {
+        String source = java.nio.file.Files.readString(java.nio.file.Path.of(
+                "src/main/java/io/github/thebusybiscuit/hotbarpets/listeners/DamageListener.java"));
+        assertTrue(source.contains("!magmacube.hasFavouriteFood(p)"));
+        assertTrue(source.contains("!magmacube.checkAndConsumeFood(p)"));
+        assertTrue(!source.contains("removeItem(magmacube.getFavouriteFood())"));
+    }
+
+    @Test
     void alreadyCancelledPhantomTargetCannotConsumePandaFood() throws Exception {
         EventHandler handler = PhantomListener.class
             .getMethod("onPhantomSpawn", EntityTargetLivingEntityEvent.class)

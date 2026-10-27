@@ -52,6 +52,23 @@ public class HotbarPet extends SlimefunItem {
     }
 
     /**
+     * Magma Cube requires favorite food even when its existing 30% charge roll
+     * does not spend it. Include an offhand stack without modifying inventory.
+     */
+    public boolean hasFavouriteFood(Player player) {
+        ItemStack required = getFavouriteFood();
+        if (required == null || required.getType().isAir()) {
+            return false;
+        }
+        if (player.getInventory().containsAtLeast(required, 1)) {
+            return true;
+        }
+        ItemStack offhand = player.getInventory().getItemInOffHand();
+        return offhand != null && !offhand.getType().isAir()
+                && offhand.getAmount() > 0 && offhand.isSimilar(required);
+    }
+
+    /**
      * Tries to consume the pets favourite food, if this was successful it will return true. Otherwise false.
      * If it fails to consume food it will send a message to the player, this is on a delay as to not spam the player.
      * The default delay is {@link #MESSAGE_DELAY}.

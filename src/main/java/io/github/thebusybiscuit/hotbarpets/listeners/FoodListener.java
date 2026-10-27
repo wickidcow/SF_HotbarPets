@@ -4,7 +4,6 @@ import io.github.thebusybiscuit.hotbarpets.HotbarPet;
 import io.github.thebusybiscuit.hotbarpets.HotbarPets;
 import io.github.thebusybiscuit.slimefun4.api.items.SlimefunItem;
 import io.github.thebusybiscuit.slimefun4.utils.SlimefunUtils;
-import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
@@ -17,8 +16,6 @@ import org.bukkit.plugin.Plugin;
 import org.bukkit.potion.PotionEffectType;
 
 public class FoodListener implements Listener {
-
-    private static final LegacyComponentSerializer LEGACY_AMPERSAND = LegacyComponentSerializer.legacyAmpersand();
 
     private final HotbarPets plugin;
     private final HotbarPet pig;
@@ -56,30 +53,32 @@ public class FoodListener implements Listener {
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onEat(PlayerItemConsumeEvent e) {
         Player p = e.getPlayer();
-
+        boolean pigQueued = false;
+        boolean zombieQueued = false;
+        // Several copies of one pet must not queue duplicate payouts for
+        // one food event. Pig and Zombie remain independent abilities.
         for (int i = 0; i < 9; ++i) {
             ItemStack item = p.getInventory().getItem(i);
 
-            if (pig != null && pig.canUse(p) && SlimefunUtils.isItemSimilar(item, pig.getItem(), true)) {
-                if (!p.getInventory().containsAtLeast(pig.getFavouriteFood(), 1)) {
-                    p.sendMessage(LEGACY_AMPERSAND.deserialize(
-                        "&9Your &5Pig Pet&9" + HotbarPet.HUNGRY_MESSAGE
-                    ));
-                    return;
-                }
-
+            if (!pigQueued && pig != null && pig.canUse(p)
+                    && SlimefunUtils.isItemSimilar(item, pig.getItem(), true)) {
+                // Payment is verified when the entity-owned callback executes.
+                // A storage-only precheck would incorrectly reject offhand food.
                 schedulePigEffect(plugin, pig, p);
-            } else if (zombie != null && zombie.canUse(p)
+                pigQueued = true;
+            } else if (!zombieQueued && zombie != null && zombie.canUse(p)
                     && SlimefunUtils.isItemSimilar(e.getItem(), new ItemStack(Material.ROTTEN_FLESH), true)
                     && SlimefunUtils.isItemSimilar(item, zombie.getItem(), true)) {
                 p.getScheduler().runDelayed(plugin, task -> {
-                    // Permissions can change before this delayed Folia-owned
-                    // callback executes; keep Zombie consistent with Pig.
                     if (!zombie.canUse(p)) {
                         return;
                     }
                     p.removePotionEffect(PotionEffectType.HUNGER);
                 }, null, 2L);
+                zombieQueued = true;
+            }
+            if (pigQueued && zombieQueued) {
+                break;
             }
         }
     }

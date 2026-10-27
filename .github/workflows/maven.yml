@@ -68,7 +68,7 @@ jobs:
           import os,re,zipfile,xml.etree.ElementTree as ET
           from pathlib import Path
           reports=[ET.parse(p).getroot() for p in Path('test-evidence').glob('TEST-*.xml')]
-          assert sum(int(r.attrib['tests']) for r in reports)==39
+          assert sum(int(r.attrib['tests']) for r in reports)==45
           assert all(int(r.attrib[k])==0 for r in reports for k in ('failures','errors','skipped'))
           with zipfile.ZipFile('dist/'+os.environ['OUTPUT_NAME']) as jar:
               assert jar.testzip() is None

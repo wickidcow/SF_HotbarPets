@@ -50,6 +50,22 @@ class FavoriteFoodAnySlotTest {
     }
 
     @Test
+    void favoriteFoodInOffhandSatisfiesMagmaCarryRequirement() {
+        when(inventory.containsAtLeast(template, 1)).thenReturn(false);
+        when(inventory.getItemInOffHand()).thenReturn(new ItemStack(Material.CARROT));
+        assertTrue(pet.hasFavouriteFood(player));
+        verify(inventory, never()).removeItemAnySlot(any(ItemStack.class));
+    }
+
+    @Test
+    void missingFavoriteFoodDoesNotSatisfyMagmaCarryRequirement() {
+        when(inventory.containsAtLeast(template, 1)).thenReturn(false);
+        when(inventory.getItemInOffHand()).thenReturn(new ItemStack(Material.STONE));
+        assertFalse(pet.hasFavouriteFood(player));
+        verify(inventory, never()).removeItemAnySlot(any(ItemStack.class));
+    }
+
+    @Test
     void paidAnySlotRemovalMustRequestOneItemWithoutMutatingTemplate() {
         when(inventory.removeItemAnySlot(any(ItemStack.class)))
                 .thenReturn(new HashMap<>());
