@@ -235,3 +235,102 @@ jobs:
             native/hotbarpets-runtime/smoke-result.txt
           retention-days: 14
           if-no-files-found: warn
+
+  # Advisory Folia 26.2 beta runtime evidence, separate from stable Paper.
+  # This validates startup/restart and declared-addon ownership, not gameplay.
+  native-folia-addon-smoke:
+    name: Advisory two-boot Folia 26.2 with published Slimefun 4.1.78
+    if: github.event_name == 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+      - name: Check out exact released core's Folia harness
+        uses: actions/checkout@v6
+        with:
+          repository: wickidcow/Slimefun-Legacy
+          ref: b14a3bcc5ef221c013f93d49b6b3a1bbdb3101e9
+          path: native/slimefun-core
+          persist-credentials: false
+      - name: Download candidate as verified uncompressed JAR
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ env.OUTPUT_NAME }}
+          path: native/addon
+          skip-decompress: true
+      - name: Pin official release JAR and prepare exact single-addon admission
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ADDON_SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p native/release
+          gh release download v4.1.78 --repo wickidcow/Slimefun-Legacy \
+            --pattern Slimefun-Legacy4.1.78.jar --dir native/release
+          printf '%s  %s\n' \
+            39ca485409b27d1705a28a24e3d6e681e731709d4163bcd500d347b090ea97ba \
+            native/release/Slimefun-Legacy4.1.78.jar | sha256sum --check --strict
+          test -s "native/addon/$OUTPUT_NAME"
+          printf '%s\tHotbarPets\n' "$OUTPUT_NAME" > native/folia-expected.tsv
+          python3 - <<'PY'
+          import hashlib, json, os, re
+          from pathlib import Path
+          core=Path('native/release/Slimefun-Legacy4.1.78.jar').read_bytes()
+          addon_path=Path('native/addon')/os.environ['OUTPUT_NAME']
+          addon=addon_path.read_bytes()
+          sha=hashlib.sha256(addon).hexdigest()
+          assert addon and re.fullmatch('[0-9a-f]{40}', os.environ['ADDON_SOURCE_SHA'])
+          payload={
+              'schema':1,
+              'scope':'folia-declared-startup-runtime-selection',
+              'core_source_commit':'b14a3bcc5ef221c013f93d49b6b3a1bbdb3101e9',
+              'bundle_sha256':hashlib.sha256(core+addon).hexdigest(),
+              'addon_count':1,
+              'addons':[{
+                  'jar':addon_path.name,
+                  'plugin':'HotbarPets',
+                  'jar_sha256':sha,
+                  'commit':os.environ['ADDON_SOURCE_SHA']
+              }]
+          }
+          Path('native/folia-selection.json').write_text(json.dumps(payload,indent=2,sort_keys=True)+'\n')
+          print('Folia addon candidate SHA-256:',sha)
+          PY
+      - name: Boot official Folia 26.2 beta twice with declared addon
+        env:
+          SERVER_SOFTWARE: folia
+          SERVER_MINECRAFT_VERSION: '26.2'
+          SERVER_DOWNLOAD_USER_AGENT: 'Slimefun-Legacy-HotbarPets-Folia-PR/1.0 (https://github.com/wickidcow/SF_HotbarPets)'
+          SLIMEFUN_SMOKE_VERSION: '4.1.78'
+          SLIMEFUN_SMOKE_SOURCE_COMMIT: b14a3bcc5ef221c013f93d49b6b3a1bbdb3101e9
+          SLIMEFUN_SMOKE_EXTRA_PLUGIN_DIR: native/addon
+          SLIMEFUN_SMOKE_EXPECT_PLUGINS_FILE: native/folia-expected.tsv
+          SLIMEFUN_SMOKE_SELECTION_FILE: native/folia-selection.json
+        run: |
+          set -euo pipefail
+          bash native/slimefun-core/scripts/paper_family_26_2_runtime_smoke.sh \
+            native/release/Slimefun-Legacy4.1.78.jar native/folia-hotbarpets-runtime
+          test -s native/folia-hotbarpets-runtime/smoke-result.txt
+          grep -Fq 'Declared Folia addons enabled per boot: 1' \
+            native/folia-hotbarpets-runtime/smoke-result.txt
+      - name: Retain Folia beta two-boot receipts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: hotbarpets-4.1.78-folia-26.2-beta-native-smoke
+          path: |
+            native/folia-expected.tsv
+            native/folia-selection.json
+            native/folia-hotbarpets-runtime/*.console.log
+            native/folia-hotbarpets-runtime/runtime-build.txt
+            native/folia-hotbarpets-runtime/smoke-result.txt
+            native/folia-hotbarpets-runtime/installed-plugins.json
+          retention-days: 14
+          if-no-files-found: warn
