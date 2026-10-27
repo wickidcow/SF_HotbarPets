@@ -29,6 +29,10 @@ public class FoodListener implements Listener {
 
         pig = (HotbarPet) SlimefunItem.getById("HOTBAR_PET_PIG");
         zombie = (HotbarPet) SlimefunItem.getById("HOTBAR_PET_ZOMBIE");
+
+        // All other pet listeners self-register. Without this line the Pig
+        // and Zombie PlayerItemConsumeEvent abilities never receive events.
+        plugin.getServer().getPluginManager().registerEvents(this, plugin);
     }
 
     /**
