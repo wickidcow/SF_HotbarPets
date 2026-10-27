@@ -4,6 +4,7 @@ import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Phantom;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityTargetLivingEntityEvent;
 
@@ -21,7 +22,9 @@ public class PhantomListener implements Listener {
         plugin.getServer().getPluginManager().registerEvents(this, plugin);
     }
 
-    @EventHandler
+    // Another plugin may have already denied targeting this player.
+    // Do not spend Panda food or remove entities for cancelled targets.
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onPhantomSpawn(EntityTargetLivingEntityEvent e) {
         if (e.getEntityType() == EntityType.PHANTOM && ((Phantom) e.getEntity()).getTarget() instanceof Player) {
             Player p = (Player) ((Phantom) e.getEntity()).getTarget();
