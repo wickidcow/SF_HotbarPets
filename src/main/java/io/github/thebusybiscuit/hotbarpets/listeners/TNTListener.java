@@ -46,8 +46,17 @@ public class TNTListener implements Listener {
         } else if (!Slimefun.getProtectionManager()
                 .hasPermission(attacker, e.getEntity().getLocation(), Interaction.ATTACK_PLAYER)) {
             e.setCancelled(true);
-            attacker.sendMessage(Component.text("You cannot harm Players in here!", NamedTextColor.DARK_RED));
+            // The owner may be in a separate Folia region from the victim.
+            // Never deliver an Adventure message by touching that player here.
+            notifyOwnerOnEntityScheduler(plugin, attacker);
         }
+    }
+ 
+    static void notifyOwnerOnEntityScheduler(HotbarPets plugin, Player owner) {
+        owner.getScheduler().run(plugin,
+                task -> owner.sendMessage(Component.text(
+                        "You cannot harm Players in here!", NamedTextColor.DARK_RED)),
+                null);
     }
 
     @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
