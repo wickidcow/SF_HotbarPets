@@ -71,6 +71,17 @@ class FoodListenerFoliaContractTest {
     }
 
     @Test
+    void foodBenefitsAreNotScheduledForCancelledConsumption() throws Exception {
+        var handler = io.github.thebusybiscuit.hotbarpets.listeners.FoodListener.class
+            .getMethod("onEat", org.bukkit.event.player.PlayerItemConsumeEvent.class)
+            .getAnnotation(org.bukkit.event.EventHandler.class);
+        assertTrue(handler != null && handler.ignoreCancelled(),
+            "Cancelled consumption cannot grant either Pig or Zombie perks");
+        assertTrue(handler.priority() == org.bukkit.event.EventPriority.MONITOR,
+            "Observe final consumption state after ordinary cancellation handlers");
+    }
+
+    @Test
     void bothDelayedFoodBranchesRemainEntityOwned() throws IOException {
         String source = Files.readString(SOURCE);
         int first = source.indexOf("p.getScheduler().runDelayed");

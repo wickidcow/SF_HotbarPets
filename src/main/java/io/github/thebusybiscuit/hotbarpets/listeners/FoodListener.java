@@ -9,9 +9,11 @@ import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerItemConsumeEvent;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.plugin.Plugin;
 import org.bukkit.potion.PotionEffectType;
 
 public class FoodListener implements Listener {
@@ -29,7 +31,25 @@ public class FoodListener implements Listener {
         zombie = (HotbarPet) SlimefunItem.getById("HOTBAR_PET_ZOMBIE");
     }
 
-    @EventHandler
+    /**
+     * Runs the Pig reward only when its two-tick-later food debit and optional
+     * entitlement check actually succeed. Keep mutations on the player's
+     * owning entity scheduler for Paper and Folia.
+     */
+    static void schedulePigEffect(Plugin plugin, HotbarPet pig, Player p) {
+        p.getScheduler().runDelayed(plugin, task -> {
+            if (!pig.checkAndConsumeFood(p)) {
+                return;
+            }
+            p.setSaturation(p.getSaturation() + 8.0F);
+            p.removePotionEffect(PotionEffectType.POISON);
+            p.getWorld().playSound(p.getLocation(), Sound.ENTITY_PIG_AMBIENT, 1.0F, 2.0F);
+        }, null, 2L);
+    }
+
+    // Observe the final consumption outcome after higher-priority protection
+    // plugins, without changing the original vanilla item-consumption event.
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onEat(PlayerItemConsumeEvent e) {
         Player p = e.getPlayer();
 
@@ -44,16 +64,7 @@ public class FoodListener implements Listener {
                     return;
                 }
 
-                p.getScheduler().runDelayed(plugin, task -> {
-                    // Food may have moved during the two-tick delay. Recheck
-                    // permission and consume actual food before applying effects.
-                    if (!pig.checkAndConsumeFood(p)) {
-                        return;
-                    }
-                    p.setSaturation(p.getSaturation() + 8.0F);
-                    p.removePotionEffect(PotionEffectType.POISON);
-                    p.getWorld().playSound(p.getLocation(), Sound.ENTITY_PIG_AMBIENT, 1.0F, 2.0F);
-                }, null, 2L);
+                schedulePigEffect(plugin, pig, p);
             } else if (zombie != null && zombie.canUse(p)
                     && SlimefunUtils.isItemSimilar(e.getItem(), new ItemStack(Material.ROTTEN_FLESH), true)
                     && SlimefunUtils.isItemSimilar(item, zombie.getItem(), true)) {
