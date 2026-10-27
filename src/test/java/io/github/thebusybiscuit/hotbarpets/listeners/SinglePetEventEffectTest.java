@@ -103,6 +103,9 @@ class SinglePetEventEffectTest {
         SlimefunItemStack cookieItem = mock(SlimefunItemStack.class);
         ItemStack first = mock(ItemStack.class), second = mock(ItemStack.class);
         Player p = twoItems(first, second);
+        // A successful damage mitigation plays a sound in the player's world.
+        when(p.getWorld()).thenReturn(mock(World.class));
+        when(p.getLocation()).thenReturn(mock(Location.class));
         when(slime.getItem()).thenReturn(slimeItem);
         when(cookie.getItem()).thenReturn(cookieItem);
         when(slime.checkAndConsumeFood(p)).thenReturn(true);
