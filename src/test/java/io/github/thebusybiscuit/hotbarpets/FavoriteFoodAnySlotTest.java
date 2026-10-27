@@ -3,29 +3,43 @@ package io.github.thebusybiscuit.hotbarpets;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
 import org.bukkit.Material;
+import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.PlayerInventory;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockbukkit.mockbukkit.MockBukkit;
-import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
-/** Use an actual inventory, not just a stubbed success flag. */
+/**
+ * API-level any-slot payment contract. MockBukkit 4.110's InventoryMock
+ * throws UnimplementedOperationException for removeItemAnySlot, so use a
+ * mocked PlayerInventory with its exact Bukkit return semantics instead.
+ * A real Paper offhand gameplay test remains an independent acceptance gate.
+ */
 class FavoriteFoodAnySlotTest {
 
-    private PlayerMock player;
+    private Player player;
+    private PlayerInventory inventory;
     private HotbarPet pet;
-    private ItemStack food;
+    private ItemStack template;
 
     @BeforeEach
     void setUp() {
-        player = MockBukkit.mock().addPlayer();
+        MockBukkit.mock();
+        player = mock(Player.class);
+        inventory = mock(PlayerInventory.class);
         pet = mock(HotbarPet.class, CALLS_REAL_METHODS);
-        food = new ItemStack(Material.CARROT);
-        doReturn(food).when(pet).getFavouriteFood();
+        template = new ItemStack(Material.CARROT, 3);
+        when(player.getInventory()).thenReturn(inventory);
+        when(player.getUniqueId()).thenReturn(UUID.randomUUID());
+        doReturn(template).when(pet).getFavouriteFood();
         doReturn(true).when(pet).canUse(player);
-        // We are testing food inventory state, not a display-name message.
         HotbarPet.getMessageDelay().put(player.getUniqueId(), Long.MAX_VALUE);
     }
 
@@ -36,24 +50,28 @@ class FavoriteFoodAnySlotTest {
     }
 
     @Test
-    void offhandFavoriteFoodMustBeDebitedBeforeAnyBenefit() {
-        player.getInventory().setItemInOffHand(new ItemStack(Material.CARROT, 2));
+    void paidAnySlotRemovalMustRequestOneItemWithoutMutatingTemplate() {
+        when(inventory.removeItemAnySlot(any(ItemStack.class)))
+                .thenReturn(new HashMap<>());
 
         assertTrue(pet.checkAndConsumeFood(player));
-        assertEquals(1, player.getInventory().getItemInOffHand().getAmount(),
-                "Offhand must pay exactly one carrot");
-        assertTrue(pet.checkAndConsumeFood(player));
-        assertTrue(player.getInventory().getItemInOffHand().getType().isAir());
-        assertFalse(pet.checkAndConsumeFood(player),
-                "No third ability without a third carrot");
-        assertEquals(1, food.getAmount(), "Shared recipe/template ItemStack must remain immutable");
+        ArgumentCaptor<ItemStack> charge = ArgumentCaptor.forClass(ItemStack.class);
+        verify(inventory, times(1)).removeItemAnySlot(charge.capture());
+        assertEquals(Material.CARROT, charge.getValue().getType());
+        assertEquals(1, charge.getValue().getAmount());
+        assertNotSame(template, charge.getValue());
+        assertEquals(3, template.getAmount(), "Shared food template must remain unchanged");
+        verify(inventory, never()).removeItem(any(ItemStack.class));
     }
 
     @Test
-    void storageFavoriteFoodDebitsOnlyOneFromMatchingStack() {
-        player.getInventory().setItem(0, new ItemStack(Material.CARROT, 3));
-        assertTrue(pet.checkAndConsumeFood(player));
-        assertEquals(2, player.getInventory().getItem(0).getAmount());
-        assertEquals(1, food.getAmount(), "Do not modify the pet's favorite food prototype");
+    void rejectedAnySlotPaymentDoesNotGrantAFreeAbility() {
+        when(inventory.removeItemAnySlot(any(ItemStack.class)))
+                .thenReturn(new HashMap<>(Map.of(0, new ItemStack(Material.CARROT))));
+
+        assertFalse(pet.checkAndConsumeFood(player));
+        verify(inventory, times(1)).removeItemAnySlot(any(ItemStack.class));
+        verify(inventory, never()).removeItem(any(ItemStack.class));
+        assertEquals(3, template.getAmount(), "Failed debit cannot alter the prototype");
     }
 }

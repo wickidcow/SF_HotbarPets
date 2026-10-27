@@ -66,8 +66,10 @@ class FoodListenerFoliaContractTest {
             "src/main/java/io/github/thebusybiscuit/hotbarpets/HotbarPet.java"));
         assertTrue(petSource.contains("if (!canUse(player))"),
             "The shared food-debit helper must recheck optional permissions");
-        assertTrue(petSource.contains("if (!player.getInventory().containsAtLeast(getFavouriteFood(), 1))"),
-            "The shared food-debit helper must require food still in the inventory");
+        assertTrue(petSource.contains("if (!player.getInventory().removeItemAnySlot(payment).isEmpty())"),
+            "The shared food-debit helper must reject unfulfilled inventory payment");
+        assertTrue(petSource.contains("payment.setAmount(1);"),
+            "Every pet ability must request exactly one favorite-food item");
     }
 
     @Test
