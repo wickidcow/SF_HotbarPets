@@ -193,3 +193,72 @@ jobs:
           fi
           gh release create v1.0.4 "$JAR" --repo "$GITHUB_REPOSITORY" --target "$APPROVED" --title 'HotbarPets 1.0.4' --notes 'Reviewed Java 21 / Paper 1.21.11-26.3 and opt-in per-pet permissions (disabled by default); no item identity or saved-pet migration.'
           echo 'Published approved HotbarPets source and exact validated JAR; no plugin source changed.' >> "$GITHUB_STEP_SUMMARY"
+
+  
+  # PR-only integration: use the already-published core and upstream's
+  # fixed-source native addon harness. Never rebuild the full core here.
+  native-paper-addon-smoke:
+    name: Two-boot Paper 26.2 / Slimefun 4.1.78 addon startup
+    if: github.event_name == 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+      - name: Check out pinned published core's native addon harness
+        uses: actions/checkout@v6
+        with:
+          repository: wickidcow/Slimefun-Legacy
+          ref: b14a3bcc5ef221c013f93d49b6b3a1bbdb3101e9
+          path: native/slimefun-core
+          persist-credentials: false
+      - name: Download exact validated candidate JAR
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ env.OUTPUT_NAME }}
+          path: native/addon
+          skip-decompress: true
+      - name: Verify official core bytes and candidate attachment
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p native/release
+          gh release download v4.1.78 --repo wickidcow/Slimefun-Legacy \
+            --pattern Slimefun-Legacy4.1.78.jar --dir native/release
+          printf '%s  %s\n' \
+            39ca485409b27d1705a28a24e3d6e681e731709d4163bcd500d347b090ea97ba \
+            native/release/Slimefun-Legacy4.1.78.jar | sha256sum --check --strict
+          test -s "native/addon/$OUTPUT_NAME"
+          sha256sum "native/addon/$OUTPUT_NAME" | tee native/addon-sha256.txt
+      - name: Boot candidate twice on official stable Paper with real Slimefun
+        env:
+          PAPER_MINECRAFT_VERSION: '26.2'
+          SLIMEFUN_SMOKE_VERSION: '4.1.78'
+          PAPER_DOWNLOAD_USER_AGENT: 'Slimefun-Legacy-HotbarPets-PR-Smoke/1.0 (https://github.com/wickidcow/SF_HotbarPets)'
+        run: |
+          set -euo pipefail
+          bash native/slimefun-core/scripts/addon_runtime_smoke.sh \
+            native/release/Slimefun-Legacy4.1.78.jar \
+            "native/addon/$OUTPUT_NAME" \
+            HotbarPets native/hotbarpets-runtime
+          test -s native/hotbarpets-runtime/smoke-result.txt
+      - name: Retain native startup and restart receipts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: hotbarpets-4.1.78-paper-26.2-native-smoke
+          path: |
+            native/addon-sha256.txt
+            native/hotbarpets-runtime/*.console.log
+            native/hotbarpets-runtime/*.normalized.log
+            native/hotbarpets-runtime/paper-build.txt
+            native/hotbarpets-runtime/smoke-result.txt
+          retention-days: 14
+          if-no-files-found: warn
