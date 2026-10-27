@@ -74,7 +74,13 @@ public class HotbarPet extends SlimefunItem {
             return false;
         }
 
-        if (!player.getInventory().containsAtLeast(getFavouriteFood(), 1)) {
+        // A player's offhand is not part of ordinary storage contents.
+        // Request one exact matching favorite-food item from *any* slot,
+        // and apply the ability only when the inventory confirms the debit.
+        // Clone first: some Bukkit implementations mutate the input amount.
+        ItemStack payment = getFavouriteFood().clone();
+        payment.setAmount(1);
+        if (!player.getInventory().removeItemAnySlot(payment).isEmpty()) {
             if (messageDelay.getOrDefault(player.getUniqueId(), 0L) <= System.currentTimeMillis()) {
                 player.sendMessage(
                     Component.text("Your ", NamedTextColor.BLUE)
@@ -90,7 +96,6 @@ public class HotbarPet extends SlimefunItem {
             return false;
         }
 
-        player.getInventory().removeItem(getFavouriteFood());
         return true;
     }
 

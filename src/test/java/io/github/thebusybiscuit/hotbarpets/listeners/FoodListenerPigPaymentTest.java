@@ -10,6 +10,8 @@ import io.github.thebusybiscuit.hotbarpets.HotbarPet;
 import io.papermc.paper.threadedregions.scheduler.EntityScheduler;
 import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import java.util.UUID;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.ConcurrentMap;
 import java.util.function.Consumer;
 import org.bukkit.Location;
@@ -45,6 +47,8 @@ class FoodListenerPigPaymentTest {
         EntityScheduler scheduler = mock(EntityScheduler.class);
         Plugin plugin = mock(Plugin.class);
         ItemStack food = mock(ItemStack.class);
+        ItemStack charge = mock(ItemStack.class);
+        when(food.clone()).thenReturn(charge);
         HotbarPet pig = mock(HotbarPet.class, CALLS_REAL_METHODS);
 
         UUID uuid = UUID.randomUUID();
@@ -56,14 +60,16 @@ class FoodListenerPigPaymentTest {
         HotbarPet.getMessageDelay().put(uuid, Long.MAX_VALUE);
         doReturn(food).when(pig).getFavouriteFood();
         doReturn(permitted).when(pig).canUse(player);
-        when(inventory.containsAtLeast(food, 1)).thenReturn(foodPresent);
+        when(inventory.removeItemAnySlot(charge)).thenReturn(foodPresent
+                ? new HashMap<>()
+                : new HashMap<>(Map.of(0, charge)));
 
         FoodListener.schedulePigEffect(plugin, pig, player);
         ArgumentCaptor<Consumer> scheduled = ArgumentCaptor.forClass(Consumer.class);
         verify(scheduler).runDelayed(eq(plugin), scheduled.capture(), isNull(), eq(2L));
         Consumer<ScheduledTask> callback = scheduled.getValue();
         assertNotNull(callback);
-        verify(inventory, never()).removeItem(food);
+        verify(inventory, never()).removeItemAnySlot(any(ItemStack.class));
         return new Harness(player, inventory, pig, food, callback);
     }
 
@@ -73,8 +79,8 @@ class FoodListenerPigPaymentTest {
         h.callback.accept(mock(ScheduledTask.class));
 
         verify(h.pig, times(1)).checkAndConsumeFood(h.player);
-        verify(h.inventory, times(1)).containsAtLeast(h.food, 1);
-        verify(h.inventory, never()).removeItem(h.food);
+        verify(h.inventory, times(1)).removeItemAnySlot(any(ItemStack.class));
+        verify(h.inventory, never()).removeItem(any(ItemStack.class));
         verify(h.player, never()).setSaturation(anyFloat());
         verify(h.player, never()).removePotionEffect(any());
     }
@@ -86,8 +92,8 @@ class FoodListenerPigPaymentTest {
 
         verify(h.pig, times(1)).checkAndConsumeFood(h.player);
         verify(h.pig, times(1)).canUse(h.player);
-        verify(h.inventory, never()).containsAtLeast(h.food, 1);
-        verify(h.inventory, never()).removeItem(h.food);
+        verify(h.inventory, never()).removeItemAnySlot(any(ItemStack.class));
+        verify(h.inventory, never()).removeItem(any(ItemStack.class));
         verify(h.player, never()).setSaturation(anyFloat());
     }
 
@@ -103,8 +109,8 @@ class FoodListenerPigPaymentTest {
         h.callback.accept(mock(ScheduledTask.class));
 
         verify(h.pig, times(1)).checkAndConsumeFood(h.player);
-        verify(h.inventory, times(1)).containsAtLeast(h.food, 1);
-        verify(h.inventory, times(1)).removeItem(h.food);
+        verify(h.inventory, times(1)).removeItemAnySlot(any(ItemStack.class));
+        verify(h.inventory, never()).removeItem(any(ItemStack.class));
         verify(h.player, times(1)).setSaturation(11.0F);
         verify(h.player, times(1)).removePotionEffect(PotionEffectType.POISON);
         verify(world, times(1)).playSound(location, Sound.ENTITY_PIG_AMBIENT, 1.0F, 2.0F);
