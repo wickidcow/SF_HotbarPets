@@ -19,8 +19,8 @@ on:
 permissions:
   contents: read
 env:
-  ARTIFACT_VERSION: '1.0.4'
-  OUTPUT_NAME: SF_HotbarPets1.0.4.jar
+  ARTIFACT_VERSION: '1.0.5'
+  OUTPUT_NAME: SF_HotbarPets1.0.5.jar
   SLIMEFUN_LEGACY_VERSION: '4.1.75'
 concurrency:
   group: sf-hotbarpets-${{ github.workflow }}-${{ github.ref }}
@@ -102,17 +102,21 @@ jobs:
 
   publish:
     name: Publish validated immutable HotbarPets release
-    needs: build
-    if: github.event_name == 'workflow_dispatch' && inputs.publish == true
+    needs: [build, native-paper-addon-smoke]
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master' && inputs.publish == true
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
       - name: Download validated raw JAR
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v8
         with:
           name: ${{ env.OUTPUT_NAME }}
           path: dist
+          skip-decompress: true
 
       - name: Validate explicit release publication request
         id: release_state
@@ -121,6 +125,21 @@ jobs:
           CONFIRM_VERSION: ${{ inputs.confirm_version }}
         run: |
           set -euo pipefail
+          # A dispatch from a PR/test branch or stale master must not publish.
+          test "$GITHUB_REF" = 'refs/heads/master'
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          CURRENT_MASTER="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/master" --jq .object.sha)"
+          test "$CURRENT_MASTER" = "$GITHUB_SHA" || {
+            echo 'Refusing publication: master advanced after workflow dispatch.' >&2
+            exit 1
+          }
+          python3 - <<'PY'
+          import os
+          import xml.etree.ElementTree as ET
+          ns = '{http://maven.apache.org/POM/4.0.0}'
+          version = ET.parse('pom.xml').getroot().findtext(ns + 'version')
+          assert version == os.environ['ARTIFACT_VERSION'], (version, os.environ['ARTIFACT_VERSION'])
+          PY
           test "$CONFIRM_VERSION" = "$ARTIFACT_VERSION" || {
             echo "Refusing publication: confirm_version must exactly match ARTIFACT_VERSION ($ARTIFACT_VERSION)." >&2
             exit 1
@@ -149,57 +168,11 @@ jobs:
           test -s "$JAR"
           gh release create "$TAG" "$JAR" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "HotbarPets $ARTIFACT_VERSION" --notes 'Publishes the reviewed Folia/Paper compatibility release. Player food effects use the owning entity scheduler, existing pet IDs/recipes/food requirements are unchanged, and the 1.21.11/Java 21 floor is retained.'
 
-  # One-time verified publication from the exact already-tested source.
-  publish_reviewed_source_once:
-    name: Publish reviewed immutable HotbarPets 1.0.4
-    needs: [build]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master' && github.event.before == 'e50c64641f961bf5da14ca839b435fdefa39b4db'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Checkout workflow-only release approval
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 2
-          persist-credentials: false
-      - name: Download validated raw Java 21 JAR
-        uses: actions/download-artifact@v8
-        with:
-          name: ${{ env.OUTPUT_NAME }}
-          path: dist
-          skip-decompress: true
-      - name: Check immutable binary/source and publish once
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          APPROVED=e50c64641f961bf5da14ca839b435fdefa39b4db
-          JAR=dist/SF_HotbarPets1.0.4.jar
-          test "$(git rev-parse HEAD^)" = "$APPROVED"
-          test "$(git diff --name-only "$APPROVED" "$GITHUB_SHA")" = '.github/workflows/maven.yml'
-          test -s "$JAR"
-          test "$(stat -c %s "$JAR")" -eq 106454
-          printf '%s  %s\n' b494dcdafc0facfdd20d650d83aa8362640e2ac5d8398e7efda35cdf69236096 "$JAR" | sha256sum --check --strict
-          unzip -p "$JAR" plugin.yml | grep -Eq "^version: ['\"]?1\.0\.4['\"]?$"
-          if gh release view v1.0.4 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo 'Refusing to replace an existing release' >&2
-            exit 1
-          fi
-          if git ls-remote --exit-code --tags origin refs/tags/v1.0.4 >/dev/null 2>&1; then
-            echo 'Refusing to replace an existing tag' >&2
-            exit 1
-          fi
-          gh release create v1.0.4 "$JAR" --repo "$GITHUB_REPOSITORY" --target "$APPROVED" --title 'HotbarPets 1.0.4' --notes 'Reviewed Java 21 / Paper 1.21.11-26.3 and opt-in per-pet permissions (disabled by default); no item identity or saved-pet migration.'
-          echo 'Published approved HotbarPets source and exact validated JAR; no plugin source changed.' >> "$GITHUB_STEP_SUMMARY"
-
-  
   # PR-only integration: use the already-published core and upstream's
   # fixed-source native addon harness. Never rebuild the full core here.
   native-paper-addon-smoke:
     name: Two-boot Paper 26.2 / Slimefun 4.1.78 addon startup
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master' && inputs.publish == true)
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 30
