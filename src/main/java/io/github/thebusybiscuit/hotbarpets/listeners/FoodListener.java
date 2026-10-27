@@ -45,10 +45,11 @@ public class FoodListener implements Listener {
                 }
 
                 p.getScheduler().runDelayed(plugin, task -> {
-                    if (!pig.canUse(p)) {
+                    // Food may have moved during the two-tick delay. Recheck
+                    // permission and consume actual food before applying effects.
+                    if (!pig.checkAndConsumeFood(p)) {
                         return;
                     }
-                    p.getInventory().removeItem(pig.getFavouriteFood());
                     p.setSaturation(p.getSaturation() + 8.0F);
                     p.removePotionEffect(PotionEffectType.POISON);
                     p.getWorld().playSound(p.getLocation(), Sound.ENTITY_PIG_AMBIENT, 1.0F, 2.0F);

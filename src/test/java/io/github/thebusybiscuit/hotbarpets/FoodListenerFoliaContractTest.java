@@ -38,13 +38,36 @@ class FoodListenerFoliaContractTest {
         String pigCallback = source.substring(first, second);
         String zombieCallback = source.substring(second);
 
-        assertTrue(pigCallback.contains("if (!pig.canUse(p))"),
-            "Pig must continue checking permission when the delayed effect executes");
+        assertTrue(pigCallback.contains("if (!pig.checkAndConsumeFood(p))"),
+            "Pig must recheck permission and consume food when the delayed effect executes");
         assertTrue(zombieCallback.contains("if (!zombie.canUse(p))"),
             "Zombie must reject a revoked permission before removing Hunger");
         assertTrue(zombieCallback.indexOf("if (!zombie.canUse(p))")
                 < zombieCallback.indexOf("p.removePotionEffect(PotionEffectType.HUNGER)"),
             "The recheck must happen before the zombie effect is applied");
+    }
+
+    @Test
+    void delayedPigCannotApplyEffectsAfterItsFoodWasRemoved() throws IOException {
+        String source = Files.readString(SOURCE);
+        int first = source.indexOf("p.getScheduler().runDelayed");
+        int second = source.indexOf("p.getScheduler().runDelayed", first + 1);
+        assertTrue(first >= 0 && second > first, "Locate the delayed Pig and Zombie callbacks");
+
+        String pigCallback = source.substring(first, second);
+        int payment = pigCallback.indexOf("if (!pig.checkAndConsumeFood(p))");
+        int effect = pigCallback.indexOf("p.setSaturation(");
+        assertTrue(payment >= 0 && effect > payment,
+            "Pig must check food and permission at execution before applying benefits");
+        assertFalse(pigCallback.contains("p.getInventory().removeItem("),
+            "Do not bypass the checked food-debit helper inside the delayed callback");
+
+        String petSource = Files.readString(Path.of(
+            "src/main/java/io/github/thebusybiscuit/hotbarpets/HotbarPet.java"));
+        assertTrue(petSource.contains("if (!canUse(player))"),
+            "The shared food-debit helper must recheck optional permissions");
+        assertTrue(petSource.contains("if (!player.getInventory().containsAtLeast(getFavouriteFood(), 1))"),
+            "The shared food-debit helper must require food still in the inventory");
     }
 
     @Test
