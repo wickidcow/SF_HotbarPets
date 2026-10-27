@@ -4,7 +4,7 @@ import io.github.thebusybiscuit.slimefun4.api.items.ItemGroup;
 import io.github.thebusybiscuit.slimefun4.api.items.SlimefunItem;
 import io.github.thebusybiscuit.slimefun4.api.items.SlimefunItemStack;
 import io.github.thebusybiscuit.slimefun4.api.recipes.RecipeType;
-import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.Map;
 import java.util.UUID;
 import net.kyori.adventure.text.Component;
@@ -21,7 +21,8 @@ public class HotbarPet extends SlimefunItem {
     // Keep the wording and leading space consistent across all hungry-pet messages.
     public static final String HUNGRY_MESSAGE =
             " would have helped you, but it's hungry! Keep its favorite food in your inventory.";
-    private static final Map<UUID, Long> messageDelay = new HashMap<>();
+    // Folia calls pets from different player-owned regions concurrently.
+    private static final Map<UUID, Long> messageDelay = new ConcurrentHashMap<>();
     private static final LegacyComponentSerializer LEGACY_SECTION = LegacyComponentSerializer.legacySection();
 
     private final ItemStack food;
