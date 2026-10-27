@@ -171,11 +171,15 @@ jobs:
   # PR-only integration: use the already-published core and upstream's
   # fixed-source native addon harness. Never rebuild the full core here.
   native-paper-addon-smoke:
-    name: Two-boot Paper 26.2 / Slimefun 4.1.78 addon startup
+    name: Two-boot stable Paper ${{ matrix.minecraft_version }} / Slimefun 4.1.78
     if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master' && inputs.publish == true)
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        minecraft_version: ['26.2', '26.3']
     steps:
       - uses: actions/checkout@v6
         with:
@@ -212,7 +216,7 @@ jobs:
           sha256sum "native/addon/$OUTPUT_NAME" | tee native/addon-sha256.txt
       - name: Boot candidate twice on official stable Paper with real Slimefun
         env:
-          PAPER_MINECRAFT_VERSION: '26.2'
+          PAPER_MINECRAFT_VERSION: ${{ matrix.minecraft_version }}
           SLIMEFUN_SMOKE_VERSION: '4.1.78'
           PAPER_DOWNLOAD_USER_AGENT: 'Slimefun-Legacy-HotbarPets-PR-Smoke/1.0 (https://github.com/wickidcow/SF_HotbarPets)'
         run: |
@@ -226,7 +230,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: hotbarpets-4.1.78-paper-26.2-native-smoke
+          name: hotbarpets-4.1.78-paper-${{ matrix.minecraft_version }}-native-smoke
           path: |
             native/addon-sha256.txt
             native/hotbarpets-runtime/*.console.log
