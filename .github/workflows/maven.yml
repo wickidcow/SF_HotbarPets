@@ -19,8 +19,8 @@ on:
 permissions:
   contents: read
 env:
-  ARTIFACT_VERSION: '1.0.5'
-  OUTPUT_NAME: SF_HotbarPets1.0.5.jar
+  ARTIFACT_VERSION: '1.0.6'
+  OUTPUT_NAME: SF_HotbarPets1.0.6.jar
   SLIMEFUN_LEGACY_VERSION: '4.1.75'
 concurrency:
   group: sf-hotbarpets-${{ github.workflow }}-${{ github.ref }}
@@ -68,7 +68,7 @@ jobs:
           import os,re,zipfile,xml.etree.ElementTree as ET
           from pathlib import Path
           reports=[ET.parse(p).getroot() for p in Path('test-evidence').glob('TEST-*.xml')]
-          assert sum(int(r.attrib['tests']) for r in reports)==50
+          assert sum(int(r.attrib['tests']) for r in reports)==56
           assert all(int(r.attrib[k])==0 for r in reports for k in ('failures','errors','skipped'))
           with zipfile.ZipFile('dist/'+os.environ['OUTPUT_NAME']) as jar:
               assert jar.testzip() is None
@@ -103,10 +103,7 @@ jobs:
   publish:
     name: Publish validated immutable HotbarPets release
     needs: [build, native-paper-addon-smoke]
-    if: >-
-      github.ref == 'refs/heads/master' &&
-      ((github.event_name == 'workflow_dispatch' && inputs.publish == true) ||
-       (github.event_name == 'push' && github.event.before == 'c122bb7433c411095fb58bf0a2f5d4bd1ed7b0a9'))
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master' && inputs.publish == true
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -127,28 +124,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           CONFIRM_VERSION: ${{ inputs.confirm_version }}
-          APPROVED_BEFORE: ${{ github.event.before }}
         run: |
           set -euo pipefail
-          # One operator-approved promotion of PR #7 on this exact master
-          # predecessor. Any different/late merge will refuse publication.
-          if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
-            test "$APPROVED_BEFORE" = 'c122bb7433c411095fb58bf0a2f5d4bd1ed7b0a9'
-            test "$(git rev-parse HEAD^1)" = 'c122bb7433c411095fb58bf0a2f5d4bd1ed7b0a9'
-            APPROVED_PR_HEAD="$(git rev-parse HEAD^2)"
-            gh api "repos/$GITHUB_REPOSITORY/pulls/7" > "$RUNNER_TEMP/hotbarpets-approved-pr.json"
-            jq -e --arg merge "$GITHUB_SHA" --arg head "$APPROVED_PR_HEAD" \
-              '.merged == true and .merge_commit_sha == $merge and .head.sha == $head and .base.ref == "master"' \
-              "$RUNNER_TEMP/hotbarpets-approved-pr.json"
-            gh api "repos/$GITHUB_REPOSITORY/actions/workflows/maven.yml/runs?event=pull_request&head_sha=$APPROVED_PR_HEAD&per_page=25" \
-              > "$RUNNER_TEMP/hotbarpets-premerge-checks.json"
-            jq -e --arg head "$APPROVED_PR_HEAD" \
-              '[.workflow_runs[] | select(.head_sha == $head and .event == "pull_request")] | sort_by(.id) | last | .conclusion == "success"' \
-              "$RUNNER_TEMP/hotbarpets-premerge-checks.json"
-            CONFIRM_VERSION="$ARTIFACT_VERSION"
-          else
-            test "$GITHUB_EVENT_NAME" = 'workflow_dispatch'
-          fi
+          # Future releases require an explicit master workflow dispatch.
+          test "$GITHUB_EVENT_NAME" = 'workflow_dispatch'
           test "$GITHUB_REF" = 'refs/heads/master'
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           CURRENT_MASTER="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/master" --jq .object.sha)"
@@ -189,50 +168,46 @@ jobs:
           test -n "$TAG"
           JAR="dist/$OUTPUT_NAME"
           test -s "$JAR"
-          gh release create "$TAG" "$JAR" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "HotbarPets $ARTIFACT_VERSION" --notes 'HotbarPets 1.0.5 repairs Pig/Zombie listener activation, favorite-food/permission payment, duplicate abilities, offhand debits, cancelled-event protection, Magma Cube 30% charge, producer overflow and Folia scheduler safety. Pig carrot/offhand and duplicate-pet behavior verified by server operator. Paper 26.2/26.3 and Purpur/Leaf/Folia startup checks passed; other actual in-game abilities and multi-region Folia still require testing. Existing 1.0.4 and Slimefun 4.1.78 binaries remain unchanged.'
+          gh release create "$TAG" "$JAR" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "HotbarPets $ARTIFACT_VERSION" --notes 'HotbarPets 1.0.6 changes the default optional ability permission prefix to slimefun.hotbarpet.*, preserving explicit custom prefixes including albion.hotbarpet.*. Default permission gating remains disabled. Existing server configs and LuckPerms nodes are not migrated automatically. All pet IDs/food and Java behavior remain unchanged; prior releases are immutable.'
 
       - name: Verify exact published bytes, metadata and source after upload
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh api "repos/$GITHUB_REPOSITORY/releases/tags/v1.0.5" > "$RUNNER_TEMP/hotbarpets-published.json"
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/v1.0.6" > "$RUNNER_TEMP/hotbarpets-published.json"
           python3 - <<'PY'
           import hashlib,json,os
           from pathlib import Path
           data=json.loads((Path(os.environ['RUNNER_TEMP'])/'hotbarpets-published.json').read_text())
           artifact=Path('dist')/os.environ['OUTPUT_NAME']
-          assert data['tag_name']=='v1.0.5' and data['target_commitish']==os.environ['GITHUB_SHA']
+          assert data['tag_name']=='v1.0.6' and data['target_commitish']==os.environ['GITHUB_SHA']
           assert len(data['assets'])==1
           meta=data['assets'][0]
           assert meta['name']==artifact.name and meta['state']=='uploaded'
           assert meta['size']==artifact.stat().st_size
           assert meta['digest']=='sha256:'+hashlib.sha256(artifact.read_bytes()).hexdigest()
-          print('Verified published HotbarPets 1.0.5:',meta['digest'])
+          print('Verified published HotbarPets 1.0.6:',meta['digest'])
           PY
           mkdir -p verified-release
-          gh release download v1.0.5 --repo "$GITHUB_REPOSITORY" \
+          gh release download v1.0.6 --repo "$GITHUB_REPOSITORY" \
             --pattern "$OUTPUT_NAME" --dir verified-release
           cmp "dist/$OUTPUT_NAME" "verified-release/$OUTPUT_NAME"
           {
-            echo '## HotbarPets 1.0.5 — verified standalone release'
+            echo '## HotbarPets 1.0.6 — verified standalone release'
             echo
             echo "Source commit: $GITHUB_SHA"
             echo "JAR: $OUTPUT_NAME"
             echo 'Both Paper 26.2/26.3 native checks and the exact test-count gate passed'
             echo 'Official released JAR matches the same-run validated binary byte-for-byte'
-            echo 'Previously published HotbarPets 1.0.4 and Slimefun 4.1.78 assets unchanged'
+            echo 'Previously published HotbarPets 1.0.5 and Slimefun 4.1.78 assets unchanged'
           } >> "$GITHUB_STEP_SUMMARY"
 
   # PR-only integration: use the already-published core and upstream's
   # fixed-source native addon harness. Never rebuild the full core here.
   native-paper-addon-smoke:
     name: Two-boot stable Paper ${{ matrix.minecraft_version }} / Slimefun 4.1.78
-    if: >-
-      github.event_name == 'pull_request' ||
-      (github.ref == 'refs/heads/master' &&
-       ((github.event_name == 'workflow_dispatch' && inputs.publish == true) ||
-        (github.event_name == 'push' && github.event.before == 'c122bb7433c411095fb58bf0a2f5d4bd1ed7b0a9')))
+    if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master' && inputs.publish == true)
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 30

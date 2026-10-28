@@ -34,9 +34,9 @@ All three can be disabled independently in `config.yml`. The classic producer-pe
 
 ## Download and compatibility
 
-Current official release: [HotbarPets v1.0.4](https://github.com/wickidcow/SF_HotbarPets/releases/tag/v1.0.4), distributed as `SF_HotbarPets1.0.4.jar`.
+Current official release: [HotbarPets v1.0.5](https://github.com/wickidcow/SF_HotbarPets/releases/tag/v1.0.5), distributed as `SF_HotbarPets1.0.5.jar`. The immutable Slimefun Legacy 4.1.78 addon bundle still contains the earlier HotbarPets 1.0.4 JAR.
 
-**Upcoming 1.0.5 (unreleased):** The review candidate in [PR #7](https://github.com/wickidcow/SF_HotbarPets/pull/7) is built as `SF_HotbarPets1.0.5.jar` with an independent test-only digest. GitHub Actions CI artifacts are **not official releases**, and must not overwrite the existing v1.0.4 JAR or the canonical Slimefun Legacy v4.1.78 addon bundle. Future publication requires reviewed `master`, a manually confirmed `publish=true` workflow dispatch, a same-run native Paper smoke, and unchanged immutable release history.
+**Upcoming 1.0.6 (unreleased):** The default optional ability permission prefix becomes `slimefun.hotbarpet.`, while custom prefixes and all pet gameplay remain unchanged. This candidate builds as `SF_HotbarPets1.0.6.jar` and does **not** republish any previous release. Master-only release publication requires an explicit `workflow_dispatch` with `publish=true` and exact version confirmation after CI.
 
 Built with **Java 25** targeting **Java 21 bytecode**. Slimefun Legacy is the primary target, with the shared Slimefun addon API retained for Slimefun United, SlimefunGuguProject/Slimefun4 and original Slimefun4-compatible implementations. Paper is primary; Purpur, Folia and Leaf are compatibility targets.
 
@@ -46,7 +46,7 @@ This maintained fork has no direct GuizhanLib dependency.
 
 Hungry Hotbar Pets now explain how to feed them: **“Your [Pet Name] would have helped you, but it's hungry! Keep its favorite food in your inventory.”** The notification preserves the pet name's colored text, fixes missing spaces, and shares one string with special-case Pig and Magma Cube reminders.
 
-## Optional per-pet ability permissions (Albion pet shop)
+## Optional per-pet ability permissions (Slimefun namespace, Albion-compatible)
 
 The addon can optionally restrict the **use of each Hotbar Pet ability** to a
 specific permission, independently of Slimefun research, crafting, item ownership
@@ -56,28 +56,36 @@ or player hotbar slots. Existing servers are unchanged unless they opt in.
 # plugins/HotbarPets/config.yml
 permission-gating:
   enabled: true
-  prefix: 'albion.hotbarpet.'
+  prefix: 'slimefun.hotbarpet.'
 ```
 
 Permission names use the registered Slimefun ID without `HOTBAR_PET_`, in
-lowercase: `HOTBAR_PET_COW` requires `albion.hotbarpet.cow`,
-`HOTBAR_PET_ENDER_MAN` requires `albion.hotbarpet.ender_man` and
-`HOTBAR_PET_DRAGON` requires `albion.hotbarpet.dragon`.
+lowercase: `HOTBAR_PET_PIG` requires `slimefun.hotbarpet.pig`,
+`HOTBAR_PET_COW` requires `slimefun.hotbarpet.cow`,
+`HOTBAR_PET_ENDER_MAN` requires `slimefun.hotbarpet.ender_man` and
+`HOTBAR_PET_DRAGON` requires `slimefun.hotbarpet.dragon`.
 Grant nodes with LuckPerms, e.g.:
 
 ```text
-lp user ExamplePlayer permission set albion.hotbarpet.cow true
+lp user ExamplePlayer permission set slimefun.hotbarpet.pig true
 ```
 
 Both click-activated and passive hotbar abilities are checked, including the
 Magma Cube lava shield, Pig/Zombie food effects and Eyamaz Soul Pie drop.
 The pet's preferred food is still consumed normally after the permission check.
 
-This mechanism is designed to work with Albion's BetonQuest NPC #132, which
-can give the real Slimefun Hotbar Pet item and grant its individual permission
-after a successful purchase. Bukkit operators may satisfy permissions by
-default; test unlocks with a regular non-OP player. The item can still be
-traded or crafted even when the recipient cannot use its power.
+**Existing Albion installations:** Your saved `plugins/HotbarPets/config.yml`
+is not replaced during an upgrade. Keeping `prefix: 'albion.hotbarpet.'` makes
+all existing NPC grants continue to work unchanged. If you intentionally switch
+to `slimefun.hotbarpet.`, update the NPC's LuckPerms grants to match. Both
+namespaces are supported as explicit choices, but **only the configured one**
+is required; the plugin does not silently accept old and new permissions together.
+
+A player may receive or trade a pet without its permission. To verify ability
+gating, use a **non-OP** account and check its effective permissions (including
+inherited group wildcards) with LuckPerms. OP or wildcard users are not valid
+negative test cases. The existing Albion NPC can continue to give the real
+Slimefun Hotbar Pet and grant the chosen permission after purchase.
 
 ## Credits and project lineage
 

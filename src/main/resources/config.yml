@@ -13,12 +13,13 @@ modern-pets:
   nautilus:
     enabled: true
 
-# Optional per-HotbarPet ability entitlement. DISABLED by default so existing
-# servers, recipes, pet ownership and trades keep working unchanged.
-# Albion's BetonQuest NPC 132 awards this node when a player buys a Hotbar Pet:
-#   albion.hotbarpet.<lowercase Slimefun item ID without HOTBAR_PET_>
-# Example: HOTBAR_PET_ENDER_MAN -> albion.hotbarpet.ender_man
-# This checks ability use; it does not prevent crafting or trading pet items.
+# Optional per-HotbarPet ability entitlement. DISABLED by default, preserving
+# existing servers, crafting, research, trades and pet possession.
+# Default permission node example: HOTBAR_PET_PIG -> slimefun.hotbarpet.pig
+#                               HOTBAR_PET_ENDER_MAN -> slimefun.hotbarpet.ender_man
+# The prefix remains configurable. Older Albion NPCs may continue to grant
+# albion.hotbarpet.* if this setting is explicitly set to 'albion.hotbarpet.'.
+# Existing plugins/HotbarPets/config.yml files are not overwritten on upgrade.
 permission-gating:
   enabled: false
-  prefix: 'albion.hotbarpet.'
+  prefix: 'slimefun.hotbarpet.'

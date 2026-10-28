@@ -9,7 +9,7 @@ import java.util.Objects;
  */
 public final class HotbarPetPermissions {
 
-    public static final String DEFAULT_PREFIX = "albion.hotbarpet.";
+    public static final String DEFAULT_PREFIX = "slimefun.hotbarpet.";
     private static final String ITEM_PREFIX = "HOTBAR_PET_";
 
     private HotbarPetPermissions() {}
