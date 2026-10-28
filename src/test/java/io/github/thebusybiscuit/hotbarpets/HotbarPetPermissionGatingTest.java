@@ -29,8 +29,9 @@ class HotbarPetPermissionGatingTest {
         YamlConfiguration cfg = new YamlConfiguration();
         cfg.set("permission-gating.enabled", false);
         Player player = mock(Player.class);
+        HotbarPets addon = plugin(cfg);
         try (MockedStatic<JavaPlugin> plugins = mockStatic(JavaPlugin.class)) {
-            plugins.when(() -> JavaPlugin.getPlugin(HotbarPets.class)).thenReturn(plugin(cfg));
+            plugins.when(() -> JavaPlugin.getPlugin(HotbarPets.class)).thenReturn(addon);
             assertTrue(pig().canUse(player));
             verify(player, never()).hasPermission(anyString());
         }
@@ -43,8 +44,9 @@ class HotbarPetPermissionGatingTest {
         cfg.set("permission-gating.prefix", "slimefun.hotbarpet.");
         Player player = mock(Player.class);
         HotbarPet pig = pig();
+        HotbarPets addon = plugin(cfg);
         try (MockedStatic<JavaPlugin> plugins = mockStatic(JavaPlugin.class)) {
-            plugins.when(() -> JavaPlugin.getPlugin(HotbarPets.class)).thenReturn(plugin(cfg));
+            plugins.when(() -> JavaPlugin.getPlugin(HotbarPets.class)).thenReturn(addon);
             assertFalse(pig.canUse(player), "Possession alone cannot grant the pet's ability");
             when(player.hasPermission("slimefun.hotbarpet.pig")).thenReturn(true);
             assertTrue(pig.canUse(player));
@@ -60,8 +62,9 @@ class HotbarPetPermissionGatingTest {
         Player player = mock(Player.class);
         when(player.hasPermission("slimefun.hotbarpet.pig")).thenReturn(true);
         HotbarPet pig = pig();
+        HotbarPets addon = plugin(cfg);
         try (MockedStatic<JavaPlugin> plugins = mockStatic(JavaPlugin.class)) {
-            plugins.when(() -> JavaPlugin.getPlugin(HotbarPets.class)).thenReturn(plugin(cfg));
+            plugins.when(() -> JavaPlugin.getPlugin(HotbarPets.class)).thenReturn(addon);
             assertFalse(pig.canUse(player));
             when(player.hasPermission("albion.hotbarpet.pig")).thenReturn(true);
             assertTrue(pig.canUse(player));
@@ -76,8 +79,9 @@ class HotbarPetPermissionGatingTest {
         Player player = mock(Player.class);
         when(player.hasPermission("albion.hotbarpet.pig")).thenReturn(true);
         HotbarPet pig = pig();
+        HotbarPets addon = plugin(cfg);
         try (MockedStatic<JavaPlugin> plugins = mockStatic(JavaPlugin.class)) {
-            plugins.when(() -> JavaPlugin.getPlugin(HotbarPets.class)).thenReturn(plugin(cfg));
+            plugins.when(() -> JavaPlugin.getPlugin(HotbarPets.class)).thenReturn(addon);
             assertFalse(pig.canUse(player));
             when(player.hasPermission("slimefun.hotbarpet.pig")).thenReturn(true);
             assertTrue(pig.canUse(player));
