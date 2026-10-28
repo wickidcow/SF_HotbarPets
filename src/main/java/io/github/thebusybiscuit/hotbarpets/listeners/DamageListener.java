@@ -9,6 +9,7 @@ import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.inventory.ItemStack;
@@ -38,7 +39,9 @@ public class DamageListener implements Listener {
         plugin.getServer().getPluginManager().registerEvents(this, plugin);
     }
 
-    @EventHandler
+    // No food debit for damage a protection plugin already cancelled.
+    // HIGHEST avoids racing ordinary LOWEST/LOW/NORMAL/HIGH guards.
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onDamage(EntityDamageEvent e) {
         if (!(e.getEntity() instanceof Player p)) {
             return;
@@ -57,42 +60,48 @@ public class DamageListener implements Listener {
 
                         e.setCancelled(true);
                         p.getWorld().playSound(p.getLocation(), Sound.ENTITY_CREEPER_PRIMED, 1.0F, 2.0F);
+                        return;
                     }
                     break;
                 case LAVA:
                     if (magmacube != null && magmacube.canUse(p) && SlimefunUtils.isItemSimilar(item, magmacube.getItem(), true)) {
-                        if (!p.getInventory().containsAtLeast(magmacube.getFavouriteFood(), 1)) {
+                        if (!magmacube.hasFavouriteFood(p)) {
                             p.sendMessage(LEGACY_AMPERSAND.deserialize(
                                 "&9Your &4Magma Cube Pet&9" + HotbarPet.HUNGRY_MESSAGE
                             ));
                             return;
                         }
 
-                        if (ThreadLocalRandom.current().nextInt(100) < 30) {
-                            p.getInventory().removeItem(magmacube.getFavouriteFood());
+                        if (ThreadLocalRandom.current().nextInt(100) < 30
+                                && !magmacube.checkAndConsumeFood(p)) {
+                            return;
                         }
 
                         e.setCancelled(true);
                         p.getWorld().playSound(p.getLocation(), Sound.ENTITY_MAGMA_CUBE_JUMP, 1.0F, 2.0F);
+                        return;
                     }
                     break;
                 case FALL:
                     if (slime != null && SlimefunUtils.isItemSimilar(item, slime.getItem(), true)) {
                         if (!slime.checkAndConsumeFood(p)) {
-                            return;
+                            // A later Cookie Slime may have different food available.
+                            continue;
                         }
 
                         e.setCancelled(true);
                         p.getWorld().playSound(p.getLocation(), Sound.BLOCK_SLIME_BLOCK_STEP, 1.0F, 2.0F);
+                        return;
                     }
 
                     if (mrCookieSlime != null && SlimefunUtils.isItemSimilar(item, mrCookieSlime.getItem(), true)) {
                         if (!mrCookieSlime.checkAndConsumeFood(p)) {
-                            return;
+                            continue;
                         }
 
                         e.setCancelled(true);
                         p.getWorld().playSound(p.getLocation(), Sound.BLOCK_SLIME_BLOCK_STEP, 1.0F, 2.0F);
+                        return;
                     }
                     break;
                 case WITHER:
@@ -104,6 +113,7 @@ public class DamageListener implements Listener {
                         e.setCancelled(true);
                         p.removePotionEffect(PotionEffectType.WITHER);
                         p.getWorld().playSound(p.getLocation(), Sound.ENTITY_WITHER_AMBIENT, 1.0F, 2.0F);
+                        return;
                     }
                     break;
                 case DROWNING:
@@ -113,6 +123,7 @@ public class DamageListener implements Listener {
                         }
 
                         e.setCancelled(true);
+                        return;
                     }
                     break;
                 case FIRE:
@@ -125,6 +136,7 @@ public class DamageListener implements Listener {
                         e.setCancelled(true);
                         p.setFireTicks(0);
                         p.getWorld().playSound(p.getLocation(), Sound.ENTITY_BLAZE_AMBIENT, 1.0F, 2.0F);
+                        return;
                     }
 
                     break;

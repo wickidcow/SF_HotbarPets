@@ -34,7 +34,9 @@ All three can be disabled independently in `config.yml`. The classic producer-pe
 
 ## Download and compatibility
 
-Release JAR naming: `SF_HotbarPets1.0.4.jar` (the v1.0.4 source bump does not itself publish a GitHub release).
+Current official release: [HotbarPets v1.0.4](https://github.com/wickidcow/SF_HotbarPets/releases/tag/v1.0.4), distributed as `SF_HotbarPets1.0.4.jar`.
+
+**Upcoming 1.0.5 (unreleased):** The review candidate in [PR #7](https://github.com/wickidcow/SF_HotbarPets/pull/7) is built as `SF_HotbarPets1.0.5.jar` with an independent test-only digest. GitHub Actions CI artifacts are **not official releases**, and must not overwrite the existing v1.0.4 JAR or the canonical Slimefun Legacy v4.1.78 addon bundle. Future publication requires reviewed `master`, a manually confirmed `publish=true` workflow dispatch, a same-run native Paper smoke, and unchanged immutable release history.
 
 Built with **Java 25** targeting **Java 21 bytecode**. Slimefun Legacy is the primary target, with the shared Slimefun addon API retained for Slimefun United, SlimefunGuguProject/Slimefun4 and original Slimefun4-compatible implementations. Paper is primary; Purpur, Folia and Leaf are compatibility targets.
 

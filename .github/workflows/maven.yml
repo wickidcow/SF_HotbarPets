@@ -19,8 +19,8 @@ on:
 permissions:
   contents: read
 env:
-  ARTIFACT_VERSION: '1.0.4'
-  OUTPUT_NAME: SF_HotbarPets1.0.4.jar
+  ARTIFACT_VERSION: '1.0.5'
+  OUTPUT_NAME: SF_HotbarPets1.0.5.jar
   SLIMEFUN_LEGACY_VERSION: '4.1.75'
 concurrency:
   group: sf-hotbarpets-${{ github.workflow }}-${{ github.ref }}
@@ -68,7 +68,7 @@ jobs:
           import os,re,zipfile,xml.etree.ElementTree as ET
           from pathlib import Path
           reports=[ET.parse(p).getroot() for p in Path('test-evidence').glob('TEST-*.xml')]
-          assert sum(int(r.attrib['tests']) for r in reports)==20
+          assert sum(int(r.attrib['tests']) for r in reports)==50
           assert all(int(r.attrib[k])==0 for r in reports for k in ('failures','errors','skipped'))
           with zipfile.ZipFile('dist/'+os.environ['OUTPUT_NAME']) as jar:
               assert jar.testzip() is None
@@ -102,25 +102,67 @@ jobs:
 
   publish:
     name: Publish validated immutable HotbarPets release
-    needs: build
-    if: github.event_name == 'workflow_dispatch' && inputs.publish == true
+    needs: [build, native-paper-addon-smoke]
+    if: >-
+      github.ref == 'refs/heads/master' &&
+      ((github.event_name == 'workflow_dispatch' && inputs.publish == true) ||
+       (github.event_name == 'push' && github.event.before == 'c122bb7433c411095fb58bf0a2f5d4bd1ed7b0a9'))
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+          persist-credentials: false
       - name: Download validated raw JAR
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v8
         with:
           name: ${{ env.OUTPUT_NAME }}
           path: dist
+          skip-decompress: true
 
       - name: Validate explicit release publication request
         id: release_state
         env:
           GH_TOKEN: ${{ github.token }}
           CONFIRM_VERSION: ${{ inputs.confirm_version }}
+          APPROVED_BEFORE: ${{ github.event.before }}
         run: |
           set -euo pipefail
+          # One operator-approved promotion of PR #7 on this exact master
+          # predecessor. Any different/late merge will refuse publication.
+          if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
+            test "$APPROVED_BEFORE" = 'c122bb7433c411095fb58bf0a2f5d4bd1ed7b0a9'
+            test "$(git rev-parse HEAD^1)" = 'c122bb7433c411095fb58bf0a2f5d4bd1ed7b0a9'
+            APPROVED_PR_HEAD="$(git rev-parse HEAD^2)"
+            gh api "repos/$GITHUB_REPOSITORY/pulls/7" > "$RUNNER_TEMP/hotbarpets-approved-pr.json"
+            jq -e --arg merge "$GITHUB_SHA" --arg head "$APPROVED_PR_HEAD" \
+              '.merged == true and .merge_commit_sha == $merge and .head.sha == $head and .base.ref == "master"' \
+              "$RUNNER_TEMP/hotbarpets-approved-pr.json"
+            gh api "repos/$GITHUB_REPOSITORY/actions/workflows/maven.yml/runs?event=pull_request&head_sha=$APPROVED_PR_HEAD&per_page=25" \
+              > "$RUNNER_TEMP/hotbarpets-premerge-checks.json"
+            jq -e --arg head "$APPROVED_PR_HEAD" \
+              '[.workflow_runs[] | select(.head_sha == $head and .event == "pull_request")] | sort_by(.id) | last | .conclusion == "success"' \
+              "$RUNNER_TEMP/hotbarpets-premerge-checks.json"
+            CONFIRM_VERSION="$ARTIFACT_VERSION"
+          else
+            test "$GITHUB_EVENT_NAME" = 'workflow_dispatch'
+          fi
+          test "$GITHUB_REF" = 'refs/heads/master'
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          CURRENT_MASTER="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/master" --jq .object.sha)"
+          test "$CURRENT_MASTER" = "$GITHUB_SHA" || {
+            echo 'Refusing publication: master advanced after workflow dispatch.' >&2
+            exit 1
+          }
+          python3 - <<'PY'
+          import os
+          import xml.etree.ElementTree as ET
+          ns = '{http://maven.apache.org/POM/4.0.0}'
+          version = ET.parse('pom.xml').getroot().findtext(ns + 'version')
+          assert version == os.environ['ARTIFACT_VERSION'], (version, os.environ['ARTIFACT_VERSION'])
+          PY
           test "$CONFIRM_VERSION" = "$ARTIFACT_VERSION" || {
             echo "Refusing publication: confirm_version must exactly match ARTIFACT_VERSION ($ARTIFACT_VERSION)." >&2
             exit 1
@@ -147,49 +189,315 @@ jobs:
           test -n "$TAG"
           JAR="dist/$OUTPUT_NAME"
           test -s "$JAR"
-          gh release create "$TAG" "$JAR" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "HotbarPets $ARTIFACT_VERSION" --notes 'Publishes the reviewed Folia/Paper compatibility release. Player food effects use the owning entity scheduler, existing pet IDs/recipes/food requirements are unchanged, and the 1.21.11/Java 21 floor is retained.'
+          gh release create "$TAG" "$JAR" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "HotbarPets $ARTIFACT_VERSION" --notes 'HotbarPets 1.0.5 repairs Pig/Zombie listener activation, favorite-food/permission payment, duplicate abilities, offhand debits, cancelled-event protection, Magma Cube 30% charge, producer overflow and Folia scheduler safety. Pig carrot/offhand and duplicate-pet behavior verified by server operator. Paper 26.2/26.3 and Purpur/Leaf/Folia startup checks passed; other actual in-game abilities and multi-region Folia still require testing. Existing 1.0.4 and Slimefun 4.1.78 binaries remain unchanged.'
 
-  # One-time verified publication from the exact already-tested source.
-  publish_reviewed_source_once:
-    name: Publish reviewed immutable HotbarPets 1.0.4
-    needs: [build]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master' && github.event.before == 'e50c64641f961bf5da14ca839b435fdefa39b4db'
+      - name: Verify exact published bytes, metadata and source after upload
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/v1.0.5" > "$RUNNER_TEMP/hotbarpets-published.json"
+          python3 - <<'PY'
+          import hashlib,json,os
+          from pathlib import Path
+          data=json.loads((Path(os.environ['RUNNER_TEMP'])/'hotbarpets-published.json').read_text())
+          artifact=Path('dist')/os.environ['OUTPUT_NAME']
+          assert data['tag_name']=='v1.0.5' and data['target_commitish']==os.environ['GITHUB_SHA']
+          assert len(data['assets'])==1
+          meta=data['assets'][0]
+          assert meta['name']==artifact.name and meta['state']=='uploaded'
+          assert meta['size']==artifact.stat().st_size
+          assert meta['digest']=='sha256:'+hashlib.sha256(artifact.read_bytes()).hexdigest()
+          print('Verified published HotbarPets 1.0.5:',meta['digest'])
+          PY
+          mkdir -p verified-release
+          gh release download v1.0.5 --repo "$GITHUB_REPOSITORY" \
+            --pattern "$OUTPUT_NAME" --dir verified-release
+          cmp "dist/$OUTPUT_NAME" "verified-release/$OUTPUT_NAME"
+          {
+            echo '## HotbarPets 1.0.5 — verified standalone release'
+            echo
+            echo "Source commit: $GITHUB_SHA"
+            echo "JAR: $OUTPUT_NAME"
+            echo 'Both Paper 26.2/26.3 native checks and the exact test-count gate passed'
+            echo 'Official released JAR matches the same-run validated binary byte-for-byte'
+            echo 'Previously published HotbarPets 1.0.4 and Slimefun 4.1.78 assets unchanged'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # PR-only integration: use the already-published core and upstream's
+  # fixed-source native addon harness. Never rebuild the full core here.
+  native-paper-addon-smoke:
+    name: Two-boot stable Paper ${{ matrix.minecraft_version }} / Slimefun 4.1.78
+    if: >-
+      github.event_name == 'pull_request' ||
+      (github.ref == 'refs/heads/master' &&
+       ((github.event_name == 'workflow_dispatch' && inputs.publish == true) ||
+        (github.event_name == 'push' && github.event.before == 'c122bb7433c411095fb58bf0a2f5d4bd1ed7b0a9')))
+    needs: build
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        minecraft_version: ['26.2', '26.3']
     steps:
-      - name: Checkout workflow-only release approval
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+      - name: Check out pinned published core's native addon harness
         uses: actions/checkout@v6
         with:
-          fetch-depth: 2
+          repository: wickidcow/Slimefun-Legacy
+          ref: b14a3bcc5ef221c013f93d49b6b3a1bbdb3101e9
+          path: native/slimefun-core
           persist-credentials: false
-      - name: Download validated raw Java 21 JAR
+      - name: Download exact validated candidate JAR
         uses: actions/download-artifact@v8
         with:
           name: ${{ env.OUTPUT_NAME }}
-          path: dist
+          path: native/addon
           skip-decompress: true
-      - name: Check immutable binary/source and publish once
+      - name: Verify official core bytes and candidate attachment
         env:
           GH_TOKEN: ${{ github.token }}
-        shell: bash
         run: |
           set -euo pipefail
-          APPROVED=e50c64641f961bf5da14ca839b435fdefa39b4db
-          JAR=dist/SF_HotbarPets1.0.4.jar
-          test "$(git rev-parse HEAD^)" = "$APPROVED"
-          test "$(git diff --name-only "$APPROVED" "$GITHUB_SHA")" = '.github/workflows/maven.yml'
-          test -s "$JAR"
-          test "$(stat -c %s "$JAR")" -eq 106454
-          printf '%s  %s\n' b494dcdafc0facfdd20d650d83aa8362640e2ac5d8398e7efda35cdf69236096 "$JAR" | sha256sum --check --strict
-          unzip -p "$JAR" plugin.yml | grep -Eq "^version: ['\"]?1\.0\.4['\"]?$"
-          if gh release view v1.0.4 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo 'Refusing to replace an existing release' >&2
-            exit 1
-          fi
-          if git ls-remote --exit-code --tags origin refs/tags/v1.0.4 >/dev/null 2>&1; then
-            echo 'Refusing to replace an existing tag' >&2
-            exit 1
-          fi
-          gh release create v1.0.4 "$JAR" --repo "$GITHUB_REPOSITORY" --target "$APPROVED" --title 'HotbarPets 1.0.4' --notes 'Reviewed Java 21 / Paper 1.21.11-26.3 and opt-in per-pet permissions (disabled by default); no item identity or saved-pet migration.'
-          echo 'Published approved HotbarPets source and exact validated JAR; no plugin source changed.' >> "$GITHUB_STEP_SUMMARY"
+          mkdir -p native/release
+          gh release download v4.1.78 --repo wickidcow/Slimefun-Legacy \
+            --pattern Slimefun-Legacy4.1.78.jar --dir native/release
+          printf '%s  %s\n' \
+            39ca485409b27d1705a28a24e3d6e681e731709d4163bcd500d347b090ea97ba \
+            native/release/Slimefun-Legacy4.1.78.jar | sha256sum --check --strict
+          test -s "native/addon/$OUTPUT_NAME"
+          sha256sum "native/addon/$OUTPUT_NAME" | tee native/addon-sha256.txt
+      - name: Boot candidate twice on official stable Paper with real Slimefun
+        env:
+          PAPER_MINECRAFT_VERSION: ${{ matrix.minecraft_version }}
+          SLIMEFUN_SMOKE_VERSION: '4.1.78'
+          PAPER_DOWNLOAD_USER_AGENT: 'Slimefun-Legacy-HotbarPets-PR-Smoke/1.0 (https://github.com/wickidcow/SF_HotbarPets)'
+        run: |
+          set -euo pipefail
+          bash native/slimefun-core/scripts/addon_runtime_smoke.sh \
+            native/release/Slimefun-Legacy4.1.78.jar \
+            "native/addon/$OUTPUT_NAME" \
+            HotbarPets native/hotbarpets-runtime
+          test -s native/hotbarpets-runtime/smoke-result.txt
+      - name: Retain native startup and restart receipts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: hotbarpets-4.1.78-paper-${{ matrix.minecraft_version }}-native-smoke
+          path: |
+            native/addon-sha256.txt
+            native/hotbarpets-runtime/*.console.log
+            native/hotbarpets-runtime/*.normalized.log
+            native/hotbarpets-runtime/paper-build.txt
+            native/hotbarpets-runtime/smoke-result.txt
+          retention-days: 14
+          if-no-files-found: warn
+
+  # Advisory Folia 26.2 beta runtime evidence, separate from stable Paper.
+  # This validates startup/restart and declared-addon ownership, not gameplay.
+  native-folia-addon-smoke:
+    name: Advisory two-boot Folia 26.2 with published Slimefun 4.1.78
+    if: github.event_name == 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+      - name: Check out exact released core's Folia harness
+        uses: actions/checkout@v6
+        with:
+          repository: wickidcow/Slimefun-Legacy
+          ref: b14a3bcc5ef221c013f93d49b6b3a1bbdb3101e9
+          path: native/slimefun-core
+          persist-credentials: false
+      - name: Download candidate as verified uncompressed JAR
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ env.OUTPUT_NAME }}
+          path: native/addon
+          skip-decompress: true
+      - name: Pin official release JAR and prepare exact single-addon admission
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ADDON_SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p native/release
+          gh release download v4.1.78 --repo wickidcow/Slimefun-Legacy \
+            --pattern Slimefun-Legacy4.1.78.jar --dir native/release
+          printf '%s  %s\n' \
+            39ca485409b27d1705a28a24e3d6e681e731709d4163bcd500d347b090ea97ba \
+            native/release/Slimefun-Legacy4.1.78.jar | sha256sum --check --strict
+          test -s "native/addon/$OUTPUT_NAME"
+          printf '%s\tHotbarPets\n' "$OUTPUT_NAME" > native/folia-expected.tsv
+          python3 - <<'PY'
+          import hashlib, json, os, re
+          from pathlib import Path
+          core=Path('native/release/Slimefun-Legacy4.1.78.jar').read_bytes()
+          addon_path=Path('native/addon')/os.environ['OUTPUT_NAME']
+          addon=addon_path.read_bytes()
+          sha=hashlib.sha256(addon).hexdigest()
+          assert addon and re.fullmatch('[0-9a-f]{40}', os.environ['ADDON_SOURCE_SHA'])
+          payload={
+              'schema':1,
+              'scope':'folia-declared-startup-runtime-selection',
+              'core_source_commit':'b14a3bcc5ef221c013f93d49b6b3a1bbdb3101e9',
+              'bundle_sha256':hashlib.sha256(core+addon).hexdigest(),
+              'addon_count':1,
+              'addons':[{
+                  'jar':addon_path.name,
+                  'plugin':'HotbarPets',
+                  'jar_sha256':sha,
+                  'commit':os.environ['ADDON_SOURCE_SHA']
+              }]
+          }
+          Path('native/folia-selection.json').write_text(json.dumps(payload,indent=2,sort_keys=True)+'\n')
+          print('Folia addon candidate SHA-256:',sha)
+          PY
+      - name: Boot official Folia 26.2 beta twice with declared addon
+        env:
+          SERVER_SOFTWARE: folia
+          SERVER_MINECRAFT_VERSION: '26.2'
+          SERVER_DOWNLOAD_USER_AGENT: 'Slimefun-Legacy-HotbarPets-Folia-PR/1.0 (https://github.com/wickidcow/SF_HotbarPets)'
+          SLIMEFUN_SMOKE_VERSION: '4.1.78'
+          SLIMEFUN_SMOKE_SOURCE_COMMIT: b14a3bcc5ef221c013f93d49b6b3a1bbdb3101e9
+          SLIMEFUN_SMOKE_EXTRA_PLUGIN_DIR: native/addon
+          SLIMEFUN_SMOKE_EXPECT_PLUGINS_FILE: native/folia-expected.tsv
+          SLIMEFUN_SMOKE_SELECTION_FILE: native/folia-selection.json
+        run: |
+          set -euo pipefail
+          bash native/slimefun-core/scripts/paper_family_26_2_runtime_smoke.sh \
+            native/release/Slimefun-Legacy4.1.78.jar native/folia-hotbarpets-runtime
+          test -s native/folia-hotbarpets-runtime/smoke-result.txt
+          grep -Fq 'Declared Folia addons enabled per boot: 1' \
+            native/folia-hotbarpets-runtime/smoke-result.txt
+      - name: Retain Folia beta two-boot receipts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: hotbarpets-4.1.78-folia-26.2-beta-native-smoke
+          path: |
+            native/folia-expected.tsv
+            native/folia-selection.json
+            native/folia-hotbarpets-runtime/*.console.log
+            native/folia-hotbarpets-runtime/runtime-build.txt
+            native/folia-hotbarpets-runtime/smoke-result.txt
+            native/folia-hotbarpets-runtime/installed-plugins.json
+          retention-days: 14
+          if-no-files-found: warn
+
+  # Advisory Purpur/Leaf 26.2 compatibility evidence, independent of stable Paper.
+  # Requires exact addon JAR digest, startup/restart and Doctor checks; not live gameplay.
+  native-purpur-leaf-addon-smoke:
+    name: Advisory two-boot ${{ matrix.software }} 26.2 with published Slimefun 4.1.78
+    if: github.event_name == 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        software: [purpur, leaf]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+      - name: Check out exact released core's Paper-family harness
+        uses: actions/checkout@v6
+        with:
+          repository: wickidcow/Slimefun-Legacy
+          ref: b14a3bcc5ef221c013f93d49b6b3a1bbdb3101e9
+          path: native/slimefun-core
+          persist-credentials: false
+      - name: Download candidate as verified uncompressed JAR
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ env.OUTPUT_NAME }}
+          path: native/addon
+          skip-decompress: true
+      - name: Pin official release JAR and prepare exact single-addon admission
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ADDON_SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p native/release
+          gh release download v4.1.78 --repo wickidcow/Slimefun-Legacy \
+            --pattern Slimefun-Legacy4.1.78.jar --dir native/release
+          printf '%s  %s\n' \
+            39ca485409b27d1705a28a24e3d6e681e731709d4163bcd500d347b090ea97ba \
+            native/release/Slimefun-Legacy4.1.78.jar | sha256sum --check --strict
+          test -s "native/addon/$OUTPUT_NAME"
+          printf '%s\tHotbarPets\n' "$OUTPUT_NAME" > native/paper-family-expected.tsv
+          python3 - <<'PY'
+          import hashlib, json, os, re
+          from pathlib import Path
+          core=Path('native/release/Slimefun-Legacy4.1.78.jar').read_bytes()
+          addon_path=Path('native/addon')/os.environ['OUTPUT_NAME']
+          addon=addon_path.read_bytes()
+          sha=hashlib.sha256(addon).hexdigest()
+          assert addon and re.fullmatch('[0-9a-f]{40}', os.environ['ADDON_SOURCE_SHA'])
+          payload={
+              'schema':1,
+              'scope':'folia-declared-startup-runtime-selection',
+              'core_source_commit':'b14a3bcc5ef221c013f93d49b6b3a1bbdb3101e9',
+              'bundle_sha256':hashlib.sha256(core+addon).hexdigest(),
+              'addon_count':1,
+              'addons':[{
+                  'jar':addon_path.name,
+                  'plugin':'HotbarPets',
+                  'jar_sha256':sha,
+                  'commit':os.environ['ADDON_SOURCE_SHA']
+              }]
+          }
+          Path('native/paper-family-selection.json').write_text(json.dumps(payload,indent=2,sort_keys=True)+'\n')
+          print('Folia addon candidate SHA-256:',sha)
+          PY
+      - name: Boot ${{ matrix.software }} 26.2 twice with declared addon
+        env:
+          SERVER_SOFTWARE: ${{ matrix.software }}
+          SERVER_MINECRAFT_VERSION: '26.2'
+          SERVER_DOWNLOAD_USER_AGENT: 'Slimefun-Legacy-HotbarPets-PR-Smoke/1.0 (https://github.com/wickidcow/SF_HotbarPets)'
+          SLIMEFUN_SMOKE_VERSION: '4.1.78'
+          SLIMEFUN_SMOKE_SOURCE_COMMIT: b14a3bcc5ef221c013f93d49b6b3a1bbdb3101e9
+          SLIMEFUN_SMOKE_EXTRA_PLUGIN_DIR: native/addon
+          SLIMEFUN_SMOKE_EXPECT_PLUGINS_FILE: native/paper-family-expected.tsv
+          SLIMEFUN_SMOKE_SELECTION_FILE: native/paper-family-selection.json
+        run: |
+          set -euo pipefail
+          bash native/slimefun-core/scripts/paper_family_26_2_runtime_smoke.sh \
+            native/release/Slimefun-Legacy4.1.78.jar native/${{ matrix.software }}-hotbarpets-runtime
+          test -s native/${{ matrix.software }}-hotbarpets-runtime/smoke-result.txt
+          grep -Fq 'Declared Folia addons enabled per boot: 1' \
+            native/${{ matrix.software }}-hotbarpets-runtime/smoke-result.txt
+      - name: Retain ${{ matrix.software }} 26.2 two-boot receipts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: hotbarpets-4.1.78-${{ matrix.software }}-26.2-native-smoke
+          path: |
+            native/paper-family-expected.tsv
+            native/paper-family-selection.json
+            native/${{ matrix.software }}-hotbarpets-runtime/*.console.log
+            native/${{ matrix.software }}-hotbarpets-runtime/runtime-build.txt
+            native/${{ matrix.software }}-hotbarpets-runtime/smoke-result.txt
+            native/${{ matrix.software }}-hotbarpets-runtime/installed-plugins.json
+          retention-days: 14
+          if-no-files-found: warn

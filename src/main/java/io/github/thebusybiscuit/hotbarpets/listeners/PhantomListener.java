@@ -1,9 +1,9 @@
 package io.github.thebusybiscuit.hotbarpets.listeners;
 
 import org.bukkit.entity.EntityType;
-import org.bukkit.entity.Phantom;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityTargetLivingEntityEvent;
 
@@ -21,18 +21,29 @@ public class PhantomListener implements Listener {
         plugin.getServer().getPluginManager().registerEvents(this, plugin);
     }
 
-    @EventHandler
+    // Another plugin may have already denied targeting this player.
+    // Do not spend Panda food or remove entities for cancelled targets.
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onPhantomSpawn(EntityTargetLivingEntityEvent e) {
-        if (e.getEntityType() == EntityType.PHANTOM && ((Phantom) e.getEntity()).getTarget() instanceof Player) {
-            Player p = (Player) ((Phantom) e.getEntity()).getTarget();
-
-            if (!hasPandaPet(p) || !panda.checkAndConsumeFood(p)) {
-                return;
-            }
-
-            e.getEntity().remove();
-            e.setCancelled(true);
+        Player player = proposedPhantomTarget(e);
+        if (player == null || panda == null) {
+            return;
         }
+        if (!hasPandaPet(player) || !panda.checkAndConsumeFood(player)) {
+            return;
+        }
+
+        e.setCancelled(true);
+        e.getEntity().remove();
+    }
+
+    /**
+     * The proposed target in this event may not have been applied to the
+     * Phantom entity yet. Never inspect Phantom.getTarget() here.
+     */
+    static Player proposedPhantomTarget(EntityTargetLivingEntityEvent event) {
+        return event.getEntityType() == EntityType.PHANTOM
+                && event.getTarget() instanceof Player player ? player : null;
     }
 
     private boolean hasPandaPet(Player player) {

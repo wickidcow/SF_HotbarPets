@@ -4,19 +4,18 @@ import io.github.thebusybiscuit.hotbarpets.HotbarPet;
 import io.github.thebusybiscuit.hotbarpets.HotbarPets;
 import io.github.thebusybiscuit.slimefun4.api.items.SlimefunItem;
 import io.github.thebusybiscuit.slimefun4.utils.SlimefunUtils;
-import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerItemConsumeEvent;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.plugin.Plugin;
 import org.bukkit.potion.PotionEffectType;
 
 public class FoodListener implements Listener {
-
-    private static final LegacyComponentSerializer LEGACY_AMPERSAND = LegacyComponentSerializer.legacyAmpersand();
 
     private final HotbarPets plugin;
     private final HotbarPet pig;
@@ -27,43 +26,59 @@ public class FoodListener implements Listener {
 
         pig = (HotbarPet) SlimefunItem.getById("HOTBAR_PET_PIG");
         zombie = (HotbarPet) SlimefunItem.getById("HOTBAR_PET_ZOMBIE");
+
+        // All other pet listeners self-register. Without this line the Pig
+        // and Zombie PlayerItemConsumeEvent abilities never receive events.
+        plugin.getServer().getPluginManager().registerEvents(this, plugin);
     }
 
-    @EventHandler
+    /**
+     * Runs the Pig reward only when its two-tick-later food debit and optional
+     * entitlement check actually succeed. Keep mutations on the player's
+     * owning entity scheduler for Paper and Folia.
+     */
+    static void schedulePigEffect(Plugin plugin, HotbarPet pig, Player p) {
+        p.getScheduler().runDelayed(plugin, task -> {
+            if (!pig.checkAndConsumeFood(p)) {
+                return;
+            }
+            p.setSaturation(p.getSaturation() + 8.0F);
+            p.removePotionEffect(PotionEffectType.POISON);
+            p.getWorld().playSound(p.getLocation(), Sound.ENTITY_PIG_AMBIENT, 1.0F, 2.0F);
+        }, null, 2L);
+    }
+
+    // Observe the final consumption outcome after higher-priority protection
+    // plugins, without changing the original vanilla item-consumption event.
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onEat(PlayerItemConsumeEvent e) {
         Player p = e.getPlayer();
-
+        boolean pigQueued = false;
+        boolean zombieQueued = false;
+        // Several copies of one pet must not queue duplicate payouts for
+        // one food event. Pig and Zombie remain independent abilities.
         for (int i = 0; i < 9; ++i) {
             ItemStack item = p.getInventory().getItem(i);
 
-            if (pig != null && pig.canUse(p) && SlimefunUtils.isItemSimilar(item, pig.getItem(), true)) {
-                if (!p.getInventory().containsAtLeast(pig.getFavouriteFood(), 1)) {
-                    p.sendMessage(LEGACY_AMPERSAND.deserialize(
-                        "&9Your &5Pig Pet&9" + HotbarPet.HUNGRY_MESSAGE
-                    ));
-                    return;
-                }
-
-                p.getScheduler().runDelayed(plugin, task -> {
-                    if (!pig.canUse(p)) {
-                        return;
-                    }
-                    p.getInventory().removeItem(pig.getFavouriteFood());
-                    p.setSaturation(p.getSaturation() + 8.0F);
-                    p.removePotionEffect(PotionEffectType.POISON);
-                    p.getWorld().playSound(p.getLocation(), Sound.ENTITY_PIG_AMBIENT, 1.0F, 2.0F);
-                }, null, 2L);
-            } else if (zombie != null && zombie.canUse(p)
+            if (!pigQueued && pig != null && pig.canUse(p)
+                    && SlimefunUtils.isItemSimilar(item, pig.getItem(), true)) {
+                // Payment is verified when the entity-owned callback executes.
+                // A storage-only precheck would incorrectly reject offhand food.
+                schedulePigEffect(plugin, pig, p);
+                pigQueued = true;
+            } else if (!zombieQueued && zombie != null && zombie.canUse(p)
                     && SlimefunUtils.isItemSimilar(e.getItem(), new ItemStack(Material.ROTTEN_FLESH), true)
                     && SlimefunUtils.isItemSimilar(item, zombie.getItem(), true)) {
                 p.getScheduler().runDelayed(plugin, task -> {
-                    // Permissions can change before this delayed Folia-owned
-                    // callback executes; keep Zombie consistent with Pig.
                     if (!zombie.canUse(p)) {
                         return;
                     }
                     p.removePotionEffect(PotionEffectType.HUNGER);
                 }, null, 2L);
+                zombieQueued = true;
+            }
+            if (pigQueued && zombieQueued) {
+                break;
             }
         }
     }

@@ -4,7 +4,7 @@ import io.github.thebusybiscuit.slimefun4.api.items.ItemGroup;
 import io.github.thebusybiscuit.slimefun4.api.items.SlimefunItem;
 import io.github.thebusybiscuit.slimefun4.api.items.SlimefunItemStack;
 import io.github.thebusybiscuit.slimefun4.api.recipes.RecipeType;
-import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.Map;
 import java.util.UUID;
 import net.kyori.adventure.text.Component;
@@ -21,7 +21,8 @@ public class HotbarPet extends SlimefunItem {
     // Keep the wording and leading space consistent across all hungry-pet messages.
     public static final String HUNGRY_MESSAGE =
             " would have helped you, but it's hungry! Keep its favorite food in your inventory.";
-    private static final Map<UUID, Long> messageDelay = new HashMap<>();
+    // Folia calls pets from different player-owned regions concurrently.
+    private static final Map<UUID, Long> messageDelay = new ConcurrentHashMap<>();
     private static final LegacyComponentSerializer LEGACY_SECTION = LegacyComponentSerializer.legacySection();
 
     private final ItemStack food;
@@ -51,6 +52,23 @@ public class HotbarPet extends SlimefunItem {
     }
 
     /**
+     * Magma Cube requires favorite food even when its existing 30% charge roll
+     * does not spend it. Include an offhand stack without modifying inventory.
+     */
+    public boolean hasFavouriteFood(Player player) {
+        ItemStack required = getFavouriteFood();
+        if (required == null || required.getType().isAir()) {
+            return false;
+        }
+        if (player.getInventory().containsAtLeast(required, 1)) {
+            return true;
+        }
+        ItemStack offhand = player.getInventory().getItemInOffHand();
+        return offhand != null && !offhand.getType().isAir()
+                && offhand.getAmount() > 0 && offhand.isSimilar(required);
+    }
+
+    /**
      * Tries to consume the pets favourite food, if this was successful it will return true. Otherwise false.
      * If it fails to consume food it will send a message to the player, this is on a delay as to not spam the player.
      * The default delay is {@link #MESSAGE_DELAY}.
@@ -73,7 +91,13 @@ public class HotbarPet extends SlimefunItem {
             return false;
         }
 
-        if (!player.getInventory().containsAtLeast(getFavouriteFood(), 1)) {
+        // A player's offhand is not part of ordinary storage contents.
+        // Request one exact matching favorite-food item from *any* slot,
+        // and apply the ability only when the inventory confirms the debit.
+        // Clone first: some Bukkit implementations mutate the input amount.
+        ItemStack payment = getFavouriteFood().clone();
+        payment.setAmount(1);
+        if (!player.getInventory().removeItemAnySlot(payment).isEmpty()) {
             if (messageDelay.getOrDefault(player.getUniqueId(), 0L) <= System.currentTimeMillis()) {
                 player.sendMessage(
                     Component.text("Your ", NamedTextColor.BLUE)
@@ -89,7 +113,6 @@ public class HotbarPet extends SlimefunItem {
             return false;
         }
 
-        player.getInventory().removeItem(getFavouriteFood());
         return true;
     }
 
