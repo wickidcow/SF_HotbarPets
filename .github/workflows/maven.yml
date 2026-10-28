@@ -103,13 +103,17 @@ jobs:
   publish:
     name: Publish validated immutable HotbarPets release
     needs: [build, native-paper-addon-smoke]
-    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master' && inputs.publish == true
+    if: >-
+      github.ref == 'refs/heads/master' &&
+      ((github.event_name == 'workflow_dispatch' && inputs.publish == true) ||
+       (github.event_name == 'push' && github.event.before == 'c122bb7433c411095fb58bf0a2f5d4bd1ed7b0a9'))
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v6
         with:
+          fetch-depth: 2
           persist-credentials: false
       - name: Download validated raw JAR
         uses: actions/download-artifact@v8
@@ -123,9 +127,28 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           CONFIRM_VERSION: ${{ inputs.confirm_version }}
+          APPROVED_BEFORE: ${{ github.event.before }}
         run: |
           set -euo pipefail
-          # A dispatch from a PR/test branch or stale master must not publish.
+          # One operator-approved promotion of PR #7 on this exact master
+          # predecessor. Any different/late merge will refuse publication.
+          if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
+            test "$APPROVED_BEFORE" = 'c122bb7433c411095fb58bf0a2f5d4bd1ed7b0a9'
+            test "$(git rev-parse HEAD^1)" = 'c122bb7433c411095fb58bf0a2f5d4bd1ed7b0a9'
+            APPROVED_PR_HEAD="$(git rev-parse HEAD^2)"
+            gh api "repos/$GITHUB_REPOSITORY/pulls/7" > "$RUNNER_TEMP/hotbarpets-approved-pr.json"
+            jq -e --arg merge "$GITHUB_SHA" --arg head "$APPROVED_PR_HEAD" \
+              '.merged == true and .merge_commit_sha == $merge and .head.sha == $head and .base.ref == "master"' \
+              "$RUNNER_TEMP/hotbarpets-approved-pr.json"
+            gh api "repos/$GITHUB_REPOSITORY/actions/workflows/maven.yml/runs?event=pull_request&head_sha=$APPROVED_PR_HEAD&per_page=25" \
+              > "$RUNNER_TEMP/hotbarpets-premerge-checks.json"
+            jq -e --arg head "$APPROVED_PR_HEAD" \
+              '[.workflow_runs[] | select(.head_sha == $head and .event == "pull_request")] | sort_by(.id) | last | .conclusion == "success"' \
+              "$RUNNER_TEMP/hotbarpets-premerge-checks.json"
+            CONFIRM_VERSION="$ARTIFACT_VERSION"
+          else
+            test "$GITHUB_EVENT_NAME" = 'workflow_dispatch'
+          fi
           test "$GITHUB_REF" = 'refs/heads/master'
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           CURRENT_MASTER="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/master" --jq .object.sha)"
@@ -166,13 +189,50 @@ jobs:
           test -n "$TAG"
           JAR="dist/$OUTPUT_NAME"
           test -s "$JAR"
-          gh release create "$TAG" "$JAR" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "HotbarPets $ARTIFACT_VERSION" --notes 'Publishes the reviewed Folia/Paper compatibility release. Player food effects use the owning entity scheduler, existing pet IDs/recipes/food requirements are unchanged, and the 1.21.11/Java 21 floor is retained.'
+          gh release create "$TAG" "$JAR" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "HotbarPets $ARTIFACT_VERSION" --notes 'HotbarPets 1.0.5 repairs Pig/Zombie listener activation, favorite-food/permission payment, duplicate abilities, offhand debits, cancelled-event protection, Magma Cube 30% charge, producer overflow and Folia scheduler safety. Pig carrot/offhand and duplicate-pet behavior verified by server operator. Paper 26.2/26.3 and Purpur/Leaf/Folia startup checks passed; other actual in-game abilities and multi-region Folia still require testing. Existing 1.0.4 and Slimefun 4.1.78 binaries remain unchanged.'
+
+      - name: Verify exact published bytes, metadata and source after upload
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/v1.0.5" > "$RUNNER_TEMP/hotbarpets-published.json"
+          python3 - <<'PY'
+          import hashlib,json,os
+          from pathlib import Path
+          data=json.loads((Path(os.environ['RUNNER_TEMP'])/'hotbarpets-published.json').read_text())
+          artifact=Path('dist')/os.environ['OUTPUT_NAME']
+          assert data['tag_name']=='v1.0.5' and data['target_commitish']==os.environ['GITHUB_SHA']
+          assert len(data['assets'])==1
+          meta=data['assets'][0]
+          assert meta['name']==artifact.name and meta['state']=='uploaded'
+          assert meta['size']==artifact.stat().st_size
+          assert meta['digest']=='sha256:'+hashlib.sha256(artifact.read_bytes()).hexdigest()
+          print('Verified published HotbarPets 1.0.5:',meta['digest'])
+          PY
+          mkdir -p verified-release
+          gh release download v1.0.5 --repo "$GITHUB_REPOSITORY" \
+            --pattern "$OUTPUT_NAME" --dir verified-release
+          cmp "dist/$OUTPUT_NAME" "verified-release/$OUTPUT_NAME"
+          {
+            echo '## HotbarPets 1.0.5 — verified standalone release'
+            echo
+            echo "Source commit: $GITHUB_SHA"
+            echo "JAR: $OUTPUT_NAME"
+            echo 'Both Paper 26.2/26.3 native checks and the exact test-count gate passed'
+            echo 'Official released JAR matches the same-run validated binary byte-for-byte'
+            echo 'Previously published HotbarPets 1.0.4 and Slimefun 4.1.78 assets unchanged'
+          } >> "$GITHUB_STEP_SUMMARY"
 
   # PR-only integration: use the already-published core and upstream's
   # fixed-source native addon harness. Never rebuild the full core here.
   native-paper-addon-smoke:
     name: Two-boot stable Paper ${{ matrix.minecraft_version }} / Slimefun 4.1.78
-    if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master' && inputs.publish == true)
+    if: >-
+      github.event_name == 'pull_request' ||
+      (github.ref == 'refs/heads/master' &&
+       ((github.event_name == 'workflow_dispatch' && inputs.publish == true) ||
+        (github.event_name == 'push' && github.event.before == 'c122bb7433c411095fb58bf0a2f5d4bd1ed7b0a9')))
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 30
