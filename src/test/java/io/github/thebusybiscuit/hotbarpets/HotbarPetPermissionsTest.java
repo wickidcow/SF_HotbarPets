@@ -2,17 +2,38 @@ package io.github.thebusybiscuit.hotbarpets;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.io.File;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.junit.jupiter.api.Test;
 
 class HotbarPetPermissionsTest {
 
-    @Test void theAlbionShopPermissionMatchesTheRealSlimefunItemId() {
-        assertEquals("albion.hotbarpet.cow",
+    @Test void defaultNodesMatchTheFullSlimefunIdSuffix() {
+        assertEquals("slimefun.hotbarpet.pig",
+                HotbarPetPermissions.permissionFor("HOTBAR_PET_PIG", null));
+        assertEquals("slimefun.hotbarpet.cow",
                 HotbarPetPermissions.permissionFor("HOTBAR_PET_COW", null));
-        assertEquals("albion.hotbarpet.ender_man",
-                HotbarPetPermissions.permissionFor("HOTBAR_PET_ENDER_MAN", "albion.hotbarpet."));
-        assertEquals("albion.hotbarpet.mrcookieslime",
+        assertEquals("slimefun.hotbarpet.ender_man",
+                HotbarPetPermissions.permissionFor("HOTBAR_PET_ENDER_MAN", null));
+        assertEquals("slimefun.hotbarpet.mrcookieslime",
                 HotbarPetPermissions.permissionFor("HOTBAR_PET_MRCOOKIESLIME", null));
+    }
+
+    @Test void explicitLegacyAlbionPrefixStillWorksWithoutMigratingPlayerNodes() {
+        assertEquals("albion.hotbarpet.pig",
+                HotbarPetPermissions.permissionFor("HOTBAR_PET_PIG", "albion.hotbarpet."));
+        assertEquals("albion.hotbarpet.ender_man",
+                HotbarPetPermissions.permissionFor("HOTBAR_PET_ENDER_MAN", "albion.hotbarpet"));
+        assertEquals("albion.hotbarpet.mrcookieslime",
+                HotbarPetPermissions.permissionFor("HOTBAR_PET_MRCOOKIESLIME", "albion.hotbarpet."));
+    }
+
+    @Test void packagedConfigDefaultsToOptionalGatingAndSlimefunNodes() {
+        YamlConfiguration defaults = YamlConfiguration.loadConfiguration(
+                new File("src/main/resources/config.yml"));
+        assertFalse(defaults.getBoolean("permission-gating.enabled", true));
+        assertEquals("slimefun.hotbarpet.", defaults.getString("permission-gating.prefix"));
+        assertEquals(2000L, defaults.getLong("production-interval-ticks"));
     }
 
     @Test void customPrefixesWorkWithOrWithoutTrailingPeriod() {
@@ -20,7 +41,7 @@ class HotbarPetPermissionsTest {
                 HotbarPetPermissions.permissionFor("HOTBAR_PET_DRAGON", "myserver.hotbarpet"));
         assertEquals("myserver.hotbarpet.dragon",
                 HotbarPetPermissions.permissionFor("HOTBAR_PET_DRAGON", "myserver.hotbarpet."));
-        assertEquals("albion.hotbarpet.dragon",
+        assertEquals("slimefun.hotbarpet.dragon",
                 HotbarPetPermissions.permissionFor("HOTBAR_PET_DRAGON", " "));
     }
 
