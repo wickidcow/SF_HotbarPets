@@ -1,0 +1,66 @@
+# One-shot release authorization from maintainer request, Nov 2, 2026.
+# This does not publish binaries itself: it dispatches the existing guarded
+# master-only release workflow, which rebuilds and runs same-run stable Paper tests.
+name: One-shot HotbarPets 1.0.6 release authorization
+on:
+  push:
+    branches: [master]
+    paths:
+      - '.github/workflows/release-hotbarpets-1.0.6-once.yml'
+permissions:
+  contents: read
+  actions: write
+concurrency:
+  group: one-shot-hotbarpets-106-release
+  cancel-in-progress: false
+jobs:
+  request-guarded-release:
+    if: github.repository == 'wickidcow/SF_HotbarPets' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Validate exact master and one-time release eligibility
+        id: preflight
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = 'refs/heads/master'
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          CURRENT_MASTER="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/master" --jq .object.sha)"
+          test "$CURRENT_MASTER" = "$GITHUB_SHA" || {
+            echo 'Master advanced; a newer checked-out release request is required.' >&2
+            exit 1
+          }
+          python3 - <<'PY'
+          import xml.etree.ElementTree as ET
+          root = ET.parse('pom.xml').getroot()
+          version = root.findtext('{http://maven.apache.org/POM/4.0.0}version')
+          assert version == '1.0.6', f'Unexpected POM version: {version}'
+          PY
+          if gh release view v1.0.6 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo 'Release v1.0.6 already exists; no second dispatch.'
+            echo 'should_dispatch=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if git ls-remote --exit-code --tags "https://github.com/${GITHUB_REPOSITORY}.git" refs/tags/v1.0.6 >/dev/null 2>&1; then
+            echo 'Tag v1.0.6 already exists; refusing to change it.' >&2
+            exit 1
+          fi
+          echo 'should_dispatch=true' >> "$GITHUB_OUTPUT"
+      - name: Dispatch established strict master release gate
+        if: steps.preflight.outputs.should_dispatch == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh workflow run maven.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref master \
+            -f publish=true \
+            -f confirm_version=1.0.6
+          echo 'Requested the existing v1.0.6 guarded workflow_dispatch.'
+          echo 'The release is NOT complete until that workflow passes and verifies published bytes.'
