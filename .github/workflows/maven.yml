@@ -408,11 +408,12 @@ jobs:
         with:
           distribution: temurin
           java-version: '25'
-      - name: Check out exact released core's Paper-family harness
+      # Harness revision is independent of the immutable 4.1.78 core JAR/source below.
+      - name: Check out pinned Paper-family harness with Leaf v3 support
         uses: actions/checkout@v6
         with:
           repository: wickidcow/Slimefun-Legacy
-          ref: b14a3bcc5ef221c013f93d49b6b3a1bbdb3101e9
+          ref: 78f3f7f6098b90062782509062070a121354e5d0
           path: native/slimefun-core
           persist-credentials: false
       - name: Download candidate as verified uncompressed JAR
